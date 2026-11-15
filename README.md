@@ -14,7 +14,7 @@
 
 ## Как запустить:
 
-Откройте **`dist/el-sueno.html`** двойным кликом — сервер не нужен. Нужен браузер с WebGL (Chrome, Firefox, Edge, Safari). Рекомендуются наушники.
+Откройте **`dist/el-sueno.html`** двойным кликом — сервер не нужен. Версия с ходьбой (WASD и джойстик) — `dist/el-sueno-walk.html`, онлайн — `/walk/`. Нужен браузер с WebGL (Chrome, Firefox, Edge, Safari). Рекомендуются наушники.
 
 Если браузер ограничивает `file://`, можно поднять локальный сервер:
 
@@ -30,10 +30,10 @@ npm run serve   # http://localhost:8080/el-sueno.html
 
 ```sh
 npm install      # ставит three@0.149.0
-npm run build    # → dist/el-sueno.html (~770 KB)
+npm run build    # → dist/el-sueno.html и dist/el-sueno-walk.html (~770 KB каждый)
 ```
 
-`build.js` склеивает `src/shell.html` + `three.min.js` + `src/{data,audio,world,systems,screens,game}.js` в один файл. Порядок скриптов важен — см. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`build.js` склеивает `src/shell.html` + `three.min.js` + `src/{data,audio,world,systems,screens,game}.js` в один файл (квест). Версия с ходьбой собирается из `versions/walk/src/{shell.html,world,systems,game}.js` и общих `src/data.js`, `src/audio.js`. Порядок скриптов важен — см. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Как тестировать
 
@@ -52,18 +52,20 @@ npm run test:setup   # pip install -r requirements.txt + браузер Chromium
 ```sh
 npm test              # сборка + десктоп
 npm run test:mobile   # сборка + мобильная эмуляция
-npm run test:all      # оба режима
+npm run test:walk     # сборка + версия с ходьбой: прохождение (десктоп) и тач-управление
+npm run test:saves    # сборка + сохранения квеста и ходьбы не мешают друг другу
+npm run test:all      # всё подряд
 ```
 
 Каждый прогон занимает несколько минут: таймеры погони и кат-сцены идут в реальном времени. При любой упавшей проверке скрипт завершается с кодом 1. Переменная `CHROME_PATH` позволяет использовать установленный Chrome вместо Chromium из Playwright, `E2E_URL` — проходить игру по http-адресу вместо `file://` (например, чтобы проверить заголовки деплоя).
 
 ## Как задеплоить
 
-Игра публикуется на **Cloudflare Pages** через GitHub Actions: на каждый push в `main` — сборка и e2e в двух режимах, при успехе — деплой. Заголовки безопасности и кеширования — в `deploy/cloudflare/_headers`.
+Игра публикуется на **Cloudflare Pages** через GitHub Actions: на каждый push в `main` — деплой (параллельно с e2e, от тестов не зависит), на каждый PR — preview-деплой и e2e. Заголовки безопасности и кеширования — в `deploy/cloudflare/_headers`.
 
 ```sh
-npm run site     # dist/ → site/ (index.html + _headers), то, что уходит на Pages
-npm run deploy   # ручной деплой через wrangler (минуя CI, только в крайнем случае)
+npm run build:site  # site/: index.html (квест), walk/index.html (ходьба), _headers, 404.html
+npm run deploy      # ручной деплой через wrangler (минуя CI, только в крайнем случае)
 ```
 
 Первая настройка (проект, токен, секреты GitHub), свой домен и откат — в [docs/DEPLOY.md](docs/DEPLOY.md).
@@ -79,10 +81,14 @@ npm run deploy   # ручной деплой через wrangler (минуя CI,
 │   ├── systems.js     сохранение, язык, инвентарь, архив, диалоги, загадка, интерфейс
 │   ├── screens.js     11 кадров и система активных точек
 │   └── game.js        сюжетные сценарии и класс Game
-├── dist/el-sueno.html собранная игра
-├── tests/e2e.py       сквозной тест (Playwright)
+├── versions/walk/src/ версия с ходьбой: shell.html, world.js, systems.js, game.js
+├── dist/              собранные игры: el-sueno.html, el-sueno-walk.html
+├── tests/e2e.py       сквозной тест квеста (Playwright)
+├── tests/e2e_walk.py, e2e_walk_mobile.py  тесты версии с ходьбой
+├── tests/e2e_saves.py  сохранения двух версий
+├── .claude/, .mcp.json  harness Claude Code: агенты, скиллы, хуки, Playwright MCP
 ├── docs/              документация (см. ниже)
-├── deploy/cloudflare/ заголовки для Cloudflare Pages
+├── deploy/cloudflare/ _headers и 404.html для Cloudflare Pages
 ├── scripts/site.js    подготовка каталога site/ для деплоя
 ├── .github/workflows/ CI: сборка, e2e, деплой
 ├── build.js           сборка в один HTML

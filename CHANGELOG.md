@@ -5,16 +5,25 @@
 ## [Не выпущено]
 
 ### Добавлено
+- Версия с ходьбой в репозитории: актуальные исходники (новый герой, фикс повторного срабатывания пробела, мягкая цветокоррекция страха) в `versions/walk/src/`; `src/data.js` и `src/audio.js` общие с квестом. `npm run build` собирает `dist/el-sueno.html` и `dist/el-sueno-walk.html`.
+- `npm run build:site` (вместо `site`): `site/index.html`, `site/walk/index.html`, `_headers`, `404.html` (редирект на `/`).
+- Тесты версии с ходьбой `tests/e2e_walk.py` (прохождение, 67 проверок) и `tests/e2e_walk_mobile.py` (тач, 14) — `npm run test:walk`; теперь возвращают код 1 при падении.
+- `tests/e2e_saves.py`, `npm run test:saves`: сохранения квеста и ходьбы изолированы, миграция старого сохранения.
+- Harness Claude Code: `.claude/` (агенты `spanish-editor`, `lore-keeper`, `playtester`, `code-reviewer`; скиллы `new-content`, `new-chapter`, `playtest`, `deploy`, `espanol-del-sueno`; хуки: запрет правки `dist/`, `node --check` и сборка после правки `src/`), `.mcp.json` (Playwright MCP).
+- CI: деплой в production на каждый push в `main` без ожидания e2e; preview-деплой для PR (ветка Pages = ветка PR, ссылка в summary и комментарии PR); e2e — одна job, 40 минут, квест (десктоп, мобильный) и ходьба.
 - Git-репозиторий, `package-lock.json`.
 - Документация: `README.md`, `docs/ARCHITECTURE.md`, `docs/GAME_DESIGN.md`, `docs/LORE.md`, `docs/LANGUAGE_DESIGN.md`, `docs/CONTENT_GUIDE.md`, `docs/ROADMAP.md`, `docs/DEPLOY.md`.
 - Деплой на Cloudflare Pages: `deploy/cloudflare/_headers` (CSP, security headers, `Cache-Control: no-cache`), `scripts/site.js`, npm-скрипты `site` и `deploy`.
-- GitHub Actions (`.github/workflows/ci.yml`): сборка и e2e (десктоп + мобильный) на push и PR, деплой при push в `main` после зелёных тестов.
 - Тесты: `requirements.txt`, npm-скрипты `test:all` и `test:setup`, переменная `E2E_URL`.
+
+### Изменено
+- Сохранения: у квеста и ходьбы свои ключи `localStorage` (`SAVE_KEYS`), раньше общий `el_sueno_cap1_v1` — версии на одном домене затирали партии друг друга. Старое сохранение при первом запуске переходит в квест, ходьба начинает с нуля. Формат `state` не менялся (`v: 1`).
 
 ### Решения
 - Код режима с ходьбой (`Player.move`, коллайдеры, `CAMS.test`, тач-джойстик) не удаляется — задел под возможный гибридный режим (см. `docs/ROADMAP.md`).
 
 ### Исправлено
+- `tests/e2e_walk.py`: 3 проверки падали и на исходной сборке — «colisión» упиралась в контейнер (управление относительно камеры уводит по диагонали), «pintada» и «cuaderno» не дожидались `inter.near` после смены камеры. Тест стартует из свободной точки и ждёт ближайший объект (до 5 с).
 - `tests/e2e.py` возвращает код 1 при упавших проверках (раньше всегда 0).
 - `tests/e2e.py`: проверки видимости активных точек и выходов ждут следующего кадра (до 5 с) — под нагрузкой SwiftShader тест изредка падал на первом кадре.
 

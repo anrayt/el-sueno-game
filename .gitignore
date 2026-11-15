@@ -5,3 +5,4 @@ tests/screenshots/
 __pycache__/
 .env
 site/
+.wrangler/

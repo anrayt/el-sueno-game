@@ -8,10 +8,12 @@
     "serve": "npx --yes http-server dist -p 8080 -c-1",
     "test": "node build.js && python3 tests/e2e.py",
     "test:mobile": "node build.js && python3 tests/e2e.py m",
-    "test:all": "node build.js && python3 tests/e2e.py && python3 tests/e2e.py m",
+    "test:walk": "node build.js && python3 tests/e2e_walk.py && python3 tests/e2e_walk_mobile.py",
+    "test:saves": "node build.js && python3 tests/e2e_saves.py",
+    "test:all": "node build.js && python3 tests/e2e.py && python3 tests/e2e.py m && python3 tests/e2e_walk.py && python3 tests/e2e_walk_mobile.py && python3 tests/e2e_saves.py",
     "test:setup": "python3 -m pip install -r requirements.txt && python3 -m playwright install chromium",
-    "site": "node build.js && node scripts/site.js",
-    "deploy": "npm run site && npx --yes wrangler@4 pages deploy site --project-name=${CF_PAGES_PROJECT:-el-sueno} --branch=main"
+    "build:site": "node build.js && node scripts/site.js",
+    "deploy": "npm run build:site && npx --yes wrangler@4 pages deploy site --project-name=${CF_PAGES_PROJECT:-el-sueno} --branch=main"
   },
   "dependencies": {
     "three": "0.149.0"

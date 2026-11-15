@@ -4,7 +4,10 @@
    DATOS DEL JUEGO: todo el contenido (objetos, documentos, léxico,
    archivo, ecos) vive aquí como datos; la lógica está en los sistemas.
    ===================================================================== */
-const SAVE_KEY = 'el_sueno_cap1_v1';
+// Cada versión guarda en su clave: en el mismo dominio (/ y /walk/) comparten localStorage.
+// LEGACY_SAVE_KEY: el guardado común de antes de separar las versiones; lo hereda el quest.
+const SAVE_KEYS = { quest: 'el_sueno_cap1_quest_v1', walk: 'el_sueno_cap1_walk_v1' };
+const LEGACY_SAVE_KEY = 'el_sueno_cap1_v1';
 const SET_KEY = 'el_sueno_ajustes_v1';
 const MAX_SLOTS = 6;
 

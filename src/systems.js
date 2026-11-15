@@ -8,13 +8,15 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* ---------- SaveManager: LocalStorage con validación y tolerancia a datos dañados ---------- */
 class SaveManager {
-  constructor() { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {}; }
+  constructor() { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {}; this.key = SAVE_KEYS.quest; this.migrate(); }
+  /** El guardado común de antes (LEGACY_SAVE_KEY) pasa al quest y se borra: la versión de caminar empieza de cero. */
+  migrate() { const old = this._get(LEGACY_SAVE_KEY); if (old === null) return; if (this._get(this.key) === null) this._set(this.key, old); try { this.ok ? localStorage.removeItem(LEGACY_SAVE_KEY) : delete this.mem[LEGACY_SAVE_KEY]; } catch (e) {} }
   _get(k) { try { return this.ok ? localStorage.getItem(k) : this.mem[k] || null; } catch (e) { return null; } }
   _set(k, v) { try { if (this.ok) localStorage.setItem(k, v); else this.mem[k] = v; return true; } catch (e) { return false; } }
   fresh() { return { v: 1, scr: 'callejon1', pos: { x: 0, z: -1.6, ry: Math.PI }, flags: {}, inv: [], docs: [], words: [], archive: [], ecos: [], decisions: [], log: [], cordura: 100, time: 0, tries: 0 }; }
   /** Devuelve un estado válido o null. Un guardado corrupto se descarta sin romper el juego. */
   load() {
-    const raw = this._get(SAVE_KEY); if (!raw) return null;
+    const raw = this._get(this.key); if (!raw) return null;
     try {
       const s = JSON.parse(raw), b = this.fresh(); if (!s || typeof s !== 'object' || s.v !== 1) throw new Error('versión');
       const arr = (a, ok) => Array.isArray(a) ? a.filter(ok) : [];
@@ -24,10 +26,10 @@ class SaveManager {
       if (s.pos && isFinite(s.pos.x) && isFinite(s.pos.z)) b.pos = { x: clamp(+s.pos.x, -13, 23), z: clamp(+s.pos.z, -100, 2), ry: isFinite(s.pos.ry) ? +s.pos.ry : 0 };
       if (typeof s.scr === 'string' && SCREENS[s.scr]) b.scr = s.scr; b.cordura = isFinite(s.cordura) ? clamp(+s.cordura, 10, 100) : 100; b.time = isFinite(s.time) ? +s.time : 0; b.tries = isFinite(s.tries) ? +s.tries : 0;
       return b;
-    } catch (e) { console.warn('Guardado dañado: se ignora.', e); try { this.ok && localStorage.removeItem(SAVE_KEY); } catch (_) {} return null; }
+    } catch (e) { console.warn('Guardado dañado: se ignora.', e); try { this.ok && localStorage.removeItem(this.key); } catch (_) {} return null; }
   }
-  save(state) { return this._set(SAVE_KEY, JSON.stringify(state)); }
-  clear() { try { this.ok ? localStorage.removeItem(SAVE_KEY) : delete this.mem[SAVE_KEY]; } catch (e) {} }
+  save(state) { return this._set(this.key, JSON.stringify(state)); }
+  clear() { try { this.ok ? localStorage.removeItem(this.key) : delete this.mem[this.key]; } catch (e) {} }
   settings() { try { return Object.assign({ vol: 0.8, muted: false, voz: true }, JSON.parse(this._get(SET_KEY) || '{}')); } catch (e) { return { vol: 0.8, muted: false, voz: true }; } }
   saveSettings(o) { this._set(SET_KEY, JSON.stringify(o)); }
 }

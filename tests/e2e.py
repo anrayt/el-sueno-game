@@ -127,7 +127,7 @@ with sync_playwright() as p:
     for l in ['Seguir por','Salir a la plaza','El pasaje','Entrar en el pasaje','Seguir adelante','Ir a la puerta']: go(l)
     hs('eco4'); pick('luz'); flush(); ok('ecos 4/4', len(st()['ecos'])==4)
     tap('#nav .nv:has-text("Cruzar la puerta")'); pg.wait_for_timeout(34000); ok('final con estadísticas', ev("!document.getElementById('end').classList.contains('hidden') && document.querySelectorAll('#endStats dd').length")==7); pg.screenshot(path=os.path.join(SHOTS,'q_end.png'))
-    pg.reload(); pg.wait_for_timeout(1200); ev("()=>localStorage.setItem('el_sueno_cap1_v1','{roto')"); pg.reload(); pg.wait_for_timeout(1500); ok('guardado dañado se ignora', ev("document.getElementById('tCont').classList.contains('hidden')") and ev('!!window.__sueno'))
+    pg.reload(); pg.wait_for_timeout(1200); ev("()=>localStorage.setItem(__sueno.save.key,'{roto')"); pg.reload(); pg.wait_for_timeout(1500); ok('guardado dañado se ignora', ev("document.getElementById('tCont').classList.contains('hidden')") and ev('!!window.__sueno'))
     if MOBILE:
         tap('#tNew'); pg.wait_for_timeout(11500); flush(); ev("()=>{const g=__sueno;g.f.v_plaza=true;g.setScreen('plaza1')}"); pg.wait_for_timeout(500); hs('puertaTienda'); pg.screenshot(path=os.path.join(SHOTS,'q_m_choice.png'))
         pg.tap('#choices .ch:nth-of-type(3)'); pg.wait_for_timeout(300); ok('toque real en una opción', not st()['choice'])

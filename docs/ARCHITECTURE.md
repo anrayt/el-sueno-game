@@ -24,6 +24,8 @@ flowchart LR
     build --> out
 ```
 
+Так же собирается версия с ходьбой: `versions/walk/src/shell.html` + three.js + `src/data.js`, `src/audio.js` (общие с квестом) + `versions/walk/src/{world,systems,game}.js` → `dist/el-sueno-walk.html`. В ней нет `screens.js`: вместо кадров и активных точек — `InteractionSystem` (ближайший объект, луч от указателя), движение `Player.move` и погоня в реальном времени.
+
 `build.js` экранирует `</script` внутри кода, чтобы встроенный скрипт не закрылся раньше времени, и использует функцию-заменитель в `String.replace`, чтобы `$` в коде three.js не интерпретировался как шаблон подстановки.
 
 ## Модули и порядок загрузки
@@ -32,7 +34,7 @@ flowchart LR
 
 | Файл | Зависит от | Что даёт |
 |---|---|---|
-| `data.js` | — | `SAVE_KEY`, `SET_KEY`, `MAX_SLOTS`, `ZONES`, `ITEMS`, `DOCS`, `LEX`, `ARCHIVE`, `ECOS`, `SYMBOLS`, `PLATE_ORDER`, `PRAYER`, `SOLUTION` |
+| `data.js` | — | `SAVE_KEYS`, `LEGACY_SAVE_KEY`, `SET_KEY`, `MAX_SLOTS`, `ZONES`, `ITEMS`, `DOCS`, `LEX`, `ARCHIVE`, `ECOS`, `SYMBOLS`, `PLATE_ORDER`, `PRAYER`, `SOLUTION` |
 | `audio.js` | Web Audio, `speechSynthesis` | `AudioManager` |
 | `world.js` | `THREE`, `SYMBOLS`, `DOCS`, глобальный `game` | текстуры (`TEX`, `canvasTex`, `textTex`), `SceneManager`, `CAMS`, `CameraManager`, `Player`, `Gfx`, `zoneAt` |
 | `systems.js` | данные, `game` | хелперы `$`, `esc`, `clamp`; `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` |
@@ -223,7 +225,9 @@ sequenceDiagram
 
 `SaveManager` (`systems.js`):
 
-- ключи `localStorage`: `el_sueno_cap1_v1` — партия, `el_sueno_ajustes_v1` — громкость/звук/озвучка;
+- ключи `localStorage` (`data.js`): `SAVE_KEYS.quest` = `el_sueno_cap1_quest_v1` — партия квеста, `SAVE_KEYS.walk` = `el_sueno_cap1_walk_v1` — партия версии с ходьбой, `el_sueno_ajustes_v1` — громкость/звук/озвучка (общие для обеих версий). Ключ партии хранится в `SaveManager.key`;
+- обе версии живут на одном домене (`/` и `/walk/`, а через `file://` — в одном origin) и делят `localStorage`, поэтому ключи партий разные;
+- миграция: старое общее сохранение `LEGACY_SAVE_KEY` (`el_sueno_cap1_v1`) при первом запуске квеста переносится в `SAVE_KEYS.quest` (если там пусто) и удаляется (`SaveManager.migrate`). Версия с ходьбой его не читает и начинает с чистого листа. Формат `state` не менялся, `v` остаётся `1`. Покрыто `tests/e2e_saves.py`;
 - если `localStorage` недоступен (приватный режим, `file://` с ограничениями) — хранение в памяти, на титульном экране предупреждение «Este navegador no guarda la partida.»;
 - когда сохраняется: `saveSoon()` (debounce 400 мс) после флагов, предметов, архива, переходов; автосохранение раз в 15 с при `canAct()`; при открытии паузы; кнопка «Guardar partida»; `visibilitychange` (скрытие вкладки); `pagehide`.
 
@@ -244,7 +248,7 @@ sequenceDiagram
 
 При исключении сохранение удаляется (`console.warn('Guardado dañado: se ignora.')`), игра стартует как новая. Это покрыто e2e-тестом («guardado dañado se ignora»).
 
-Изменение формата `state` требует поднять `v` и/или ключ `SAVE_KEY`.
+Изменение формата `state` требует поднять `v` и/или ключи `SAVE_KEYS`.
 
 ## Звук
 

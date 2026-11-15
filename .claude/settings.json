@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run build:*)",
+      "Bash(npm test)",
+      "Bash(npm run test:*)",
+      "Bash(python3 tests/*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh run:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(npx wrangler:*)",
+      "Bash(wrangler:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */dist/*) echo 'dist/ генерируется сборкой — правь src/ и запусти npm run build' >&2; exit 2;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */src/*|*/versions/*) case \"$f\" in *.js) if ! err=$(node --check \"$f\" 2>&1); then echo \"$err\" | head -8 >&2; exit 2; fi;; esac; out=$(npm run build --silent 2>&1) || { echo \"Сборка упала после правки $f:\" >&2; echo \"$out\" | tail -20 >&2; exit 2; };; esac; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

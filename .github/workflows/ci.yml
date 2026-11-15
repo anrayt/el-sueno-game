@@ -10,52 +10,25 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  e2e:
-    name: e2e (${{ matrix.mode }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - mode: desktop
-            script: test
-          - mode: mobile
-            script: test:mobile
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m playwright install --with-deps chromium
-      # Собирает dist/el-sueno.html и проходит главу целиком; код возврата ≠ 0 при любой упавшей проверке.
-      - run: npm run ${{ matrix.script }}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: screenshots-${{ matrix.mode }}
-          path: tests/screenshots/
-          retention-days: 14
+env:
+  CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT || 'el-sueno' }}
 
+jobs:
+  # Продакшен: каждый push в main. От e2e не зависит — тесты идут параллельно и сигналят отдельно.
   deploy:
-    name: Cloudflare Pages
-    needs: e2e
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Cloudflare Pages (production)
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: production
+      url: https://el-sueno.pages.dev
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,9 +36,82 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run site
-      - uses: cloudflare/wrangler-action@v3
+      - run: npm run build:site
+      - run: npx --yes wrangler@4 pages deploy site --project-name "$CF_PAGES_PROJECT" --branch main --commit-hash "$GITHUB_SHA"
+
+  # Preview для pull request: ветка Pages = имя ветки PR. Секретов у PR из форков нет — там пропускается.
+  preview:
+    name: Cloudflare Pages (preview)
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BRANCH: ${{ github.head_ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy site --project-name=${{ vars.CF_PAGES_PROJECT || 'el-sueno' }} --branch=main --commit-hash=${{ github.sha }}
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:site
+      - name: wrangler pages deploy
+        run: |
+          npx --yes wrangler@4 pages deploy site --project-name "$CF_PAGES_PROJECT" --branch "$BRANCH" --commit-hash "${{ github.event.pull_request.head.sha }}" | tee deploy.log
+          url=$(grep -oE 'https://[^ ]+\.pages\.dev' deploy.log | tail -1)
+          echo "PREVIEW_URL=$url" >> "$GITHUB_ENV"
+          { echo "### Preview"; echo; echo "- Квест: $url/"; echo "- Ходьба: $url/walk/"; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Ссылка в PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="Preview ${GITHUB_SHA::7}: $PREVIEW_URL/ (квест) · $PREVIEW_URL/walk/ (ходьба)"
+          gh pr comment "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --edit-last --body "$body" \
+            || gh pr comment "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --body "$body"
+
+  e2e:
+    name: e2e
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      # requirements.txt фиксирует версию playwright
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      # Каждый шаг проходит до конца даже после падения предыдущего; код возврата ≠ 0 при любой упавшей проверке.
+      - name: квест — десктоп
+        run: python tests/e2e.py
+      - name: квест — мобильный
+        if: ${{ !cancelled() }}
+        run: python tests/e2e.py m
+      - name: ходьба — десктоп
+        if: ${{ !cancelled() }}
+        run: python tests/e2e_walk.py
+      - name: ходьба — мобильный
+        if: ${{ !cancelled() }}
+        run: python tests/e2e_walk_mobile.py
+      - name: сохранения квеста и ходьбы
+        if: ${{ !cancelled() }}
+        run: python tests/e2e_saves.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: tests/screenshots/
+          retention-days: 14

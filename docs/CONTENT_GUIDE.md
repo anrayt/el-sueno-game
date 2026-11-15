@@ -177,7 +177,7 @@ if (k < 0) { await g.think('No hago nada. Y eso también es una respuesta.'); re
 
 - Новые флаги просто начинайте использовать через `g.set('nombreFlag')`; описывайте их в таблице флагов в [GAME_DESIGN.md](GAME_DESIGN.md).
 - Флаги сохраняются как есть; новые id `ITEMS`/`DOCS`/`ARCHIVE`/`ECOS` старые сохранения не ломают.
-- Если меняется структура `state` или смысл существующих флагов — поднимите `v` в `SaveManager.fresh/load` или смените `SAVE_KEY`.
+- Если меняется структура `state` или смысл существующих флагов — поднимите `v` в `SaveManager.fresh/load` или смените ключи `SAVE_KEYS` (с миграцией, как `SaveManager.migrate`).
 
 ## Чек-лист перед коммитом
 
