@@ -2,11 +2,12 @@ import fs from 'node:fs';
 import * as esbuild from 'esbuild';
 // Собирает обе версии игры в dist/. Каждая — один самодостаточный HTML: esbuild пакует main.js
 // со всеми модулями и three.js в IIFE, который встраивается в обычный <script> (работает через file://).
-//   dist/el-sueno.html      — квест: src/main.js
-//   dist/el-sueno-walk.html — ходьба: versions/walk/src/main.js (+ общие src/data.js, src/audio.js)
+// Общий код — src/shared/, различия режимов — src/modes/:
+//   dist/el-sueno.html      — квест: src/modes/quest/main.js (+ кадры и активные точки src/modes/frame/)
+//   dist/el-sueno-walk.html — ходьба: src/modes/walk/main.js
 const VERSIONS = [
-  { out: 'dist/el-sueno.html', shell: 'src/shell.html', entry: 'src/main.js' },
-  { out: 'dist/el-sueno-walk.html', shell: 'versions/walk/src/shell.html', entry: 'versions/walk/src/main.js' },
+  { out: 'dist/el-sueno.html', shell: 'src/modes/quest/shell.html', entry: 'src/modes/quest/main.js' },
+  { out: 'dist/el-sueno-walk.html', shell: 'src/modes/walk/shell.html', entry: 'src/modes/walk/main.js' },
 ];
 fs.mkdirSync('dist', { recursive: true });
 for (const v of VERSIONS) {

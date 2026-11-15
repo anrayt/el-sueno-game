@@ -13,10 +13,10 @@
 
 ## Добавить документ
 
-`DOCS` в `src/data.js`. `text` — функция от флагов: текст может меняться по ходу игры.
+`DOCS` в `src/shared/data.js`. `text` — функция от флагов: текст может меняться по ходу игры.
 
 ```js
-// src/data.js — как сделан существующий документ
+// src/shared/data.js — как сделан существующий документ
 calendario: { title: 'Calendario', cls: '', where: 'La Tienda',
   text: () => 'NOVIEMBRE\n\nHoy es 7.\nAyer también.\nMañana también.\n\n(Todos los días del mes tienen el mismo número.)' },
 
@@ -25,14 +25,14 @@ grafiti: { title: 'Pintada en la pared', cls: 'wall', where: 'El Callejón',
   text: f => f.puertaAbierta ? 'ÉL YA NO MIRA.\nAHORA MIRAS TÚ.' : f.chaseDone ? (f.miraste ? 'MIRASTE.' : 'NO MIRASTE.\nBIEN.') : 'NO MIRES ATRÁS' },
 ```
 
-- `cls` — оформление бумаги: `''` (бумага), `news` (газета, поддерживает `<h5>`), `wall` (надпись на стене), `med` (медицинский бланк), `metal` (металлическая табличка). Стили — `.paper.*` в `src/shell.html`.
+- `cls` — оформление бумаги: `''` (бумага), `news` (газета, поддерживает `<h5>`), `wall` (надпись на стене), `med` (медицинский бланк), `metal` (металлическая табличка). Стили — `.paper.*` в `src/modes/quest/shell.html`.
 - `\n` — перенос строки (`white-space: pre-line`).
 - Открыть документ из сценария: `await g.doc('calendario');` — это добавит его в Cuaderno, выучит слова и поставит флаг `doc_calendario`.
 - Финальный экран считает `Documentos n / N` по `Object.keys(DOCS).length` автоматически.
 
 ## Добавить слово в словарь
 
-`LEX` в `src/data.js`: `[ключ, 'формы через пробел', определение, пример]`.
+`LEX` в `src/shared/data.js`: `[ключ, 'формы через пробел', определение, пример]`.
 
 ```js
 ['tirar', 'tirar tira tiras', 'Mover algo hacia ti con las manos.', 'Tira de la puerta.'],
@@ -45,7 +45,7 @@ grafiti: { title: 'Pintada en la pared', cls: 'wall', where: 'El Callejón',
 
 ## Добавить запись в архив
 
-`ARCHIVE` в `src/data.js`. `tipo`: `h` — hecho (видишь сам), `t` — testimonio (говорят), `i` — hipótesis (думаешь).
+`ARCHIVE` в `src/shared/data.js`. `tipo`: `h` — hecho (видишь сам), `t` — testimonio (говорят), `i` — hipótesis (думаешь).
 
 ```js
 venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
@@ -59,7 +59,7 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
 ## Добавить Eco
 
-1. Запись в `ECOS` (`src/data.js`):
+1. Запись в `ECOS` (`src/shared/data.js`):
 
    ```js
    eco3: { zone: 'tienda', need: f => f.tieneLlave, pre: 'La radio dice, con la voz de Anselmo:',
@@ -68,19 +68,19 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
    `need` — когда Eco появляется; `ok` — индекс правильного варианта в `ops` (варианты перемешиваются при показе); `full` — фраза целиком (озвучивается и попадает в раздел Ecos). Фраза должна быть **уже встречавшейся** в игре.
 
-2. Точка в мире (`SceneManager.build`, `src/world.js`):
+2. Точка в мире (`SceneManager.build`, `src/shared/world.js`):
 
    ```js
    this.addInter('eco3', 21.2, -34.6, { verb: 'Escuchar', y: 1.3, eco: true, on: () => game.ecoOn('eco3') });
    ```
 
-3. Добавить id в `hs` нужного кадра в `SCREENS` (`src/screens.js`).
+3. Добавить id в `hs` нужного кадра в `SCREENS` (`src/modes/frame/screens.js`).
 
-Сценарий писать не нужно: `game.js` автоматически регистрирует `SCRIPTS[id]` для каждого ключа `ECOS`.
+Сценарий писать не нужно: `scripts.js` автоматически регистрирует `SCRIPTS[id]` для каждого ключа `ECOS`.
 
 ## Добавить активную точку
 
-1. **Объект и точка в мире** — `SceneManager.build` (`src/world.js`), в секции нужной зоны:
+1. **Объект и точка в мире** — `SceneManager.build` (`src/shared/world.js`), в секции нужной зоны:
 
    ```js
    // существующий пример: пачка батареек на полке
@@ -98,7 +98,7 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
    `sync` должна оставаться идемпотентной: только выставлять состояние по флагам, никаких «переключений».
 
-3. **Сценарий** — `SCRIPTS` (`src/game.js`):
+3. **Сценарий** — `SCRIPTS` (`src/shared/scripts.js`):
 
    ```js
    async pilas(g) { if (!g.give('pilas')) return; g.set('got_pilas'); await g.think('Pilas. Son para la linterna.'); },
@@ -106,13 +106,13 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
    Всегда проверяйте результат `g.give(...)`: инвентарь ограничен 6 слотами.
 
-4. **Кадр** — добавить id в `hs` нужного кадра (`src/screens.js`). Кружок появится там, где hitbox проецируется на экран этой камеры.
+4. **Кадр** — добавить id в `hs` нужного кадра (`src/modes/frame/screens.js`). Кружок появится там, где hitbox проецируется на экран этой камеры.
 
-5. **Предмет** (если точка что-то даёт) — запись в `ITEMS` (`src/data.js`) с SVG-путём иконки в квадрате 20×20; если предмет можно использовать — ветка в `Game.useItem`; если комбинировать — `Inventory.combine`.
+5. **Предмет** (если точка что-то даёт) — запись в `ITEMS` (`src/shared/data.js`) с SVG-путём иконки в квадрате 20×20; если предмет можно использовать — ветка в `Game.useItem`; если комбинировать — `Inventory.combine`.
 
 ## Добавить новую сцену (кадр)
 
-1. **Камера** — запись в `CAMS` (`src/world.js`):
+1. **Камера** — запись в `CAMS` (`src/shared/world.js`):
 
    ```js
    { id: 'quiosco', test: () => false, pos: [-2.4, 1.75, -26.2], fov: 50, fixed: [-6.3, 1.15, -28.6] },
@@ -120,7 +120,7 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
    `pos` — положение камеры; `fixed` — точка, куда она смотрит. Без `fixed` камера следит за героем на высоте `yoff` (по умолчанию 1.25). `test` — наследие режима с ходьбой; для новых камер ставьте `() => false`.
 
-2. **Кадр** — запись в `SCREENS` (`src/screens.js`):
+2. **Кадр** — запись в `SCREENS` (`src/modes/frame/screens.js`):
 
    ```js
    quiosco: { cam: 'quiosco', at: [-5.3, -29.6], ry: -0.6, hs: ['periodico'], exits: [{ label: 'Volver a la plaza', to: 'plaza1' }] },
@@ -135,7 +135,7 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
    { label: 'Entrar en el pasaje', act: async g => { if (!g.f.luz) { await g.think('El pasaje está muy oscuro. No veo nada.', 'Necesito luz.'); return; } /* … */ await g.goTo('pasajeA'); } },
    ```
 
-4. **Новая зона** (если это новое место, а не ракурс существующего): запись в `ZONES` (`src/data.js`), границы в `zoneAt`, параметры звука в `AudioManager.update` (`Z`) и `_event` (`pool`), плотность тумана в `SceneManager.update`, вступительная мысль в `Game.events`, геометрия в `SceneManager.build`.
+4. **Новая зона** (если это новое место, а не ракурс существующего): запись в `ZONES` (`src/shared/data.js`), границы в `zoneAt`, параметры звука в `AudioManager.update` (`Z`) и `_event` (`pool`), плотность тумана в `SceneManager.update`, вступительная мысль в `Game.events`, геометрия в `SceneManager.build`.
 
 5. Обновить граф сцен в [GAME_DESIGN.md](GAME_DESIGN.md) и e2e-тест.
 

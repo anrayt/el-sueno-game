@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { $, esc, clamp } from './systems.js';
+import { $, esc, clamp } from '../../shared/util.js';
 /* =====================================================================
    ESCENAS: la partida es una serie de planos fijos. En cada plano hay
    puntos activos (objetos) y salidas (otros planos). No se camina:

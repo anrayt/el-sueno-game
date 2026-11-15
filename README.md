@@ -33,7 +33,7 @@ npm install      # ставит three@0.149.0
 npm run build    # → dist/el-sueno.html и dist/el-sueno-walk.html (~570 KB каждый)
 ```
 
-`build.js` собирает каждую версию esbuild'ом из ES-модулей (точка входа `src/main.js` или `versions/walk/src/main.js`, three.js через `import`) в один IIFE и встраивает его в `shell.html` — получается один HTML, который открывается через `file://`. Подробнее — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`build.js` собирает каждую версию esbuild'ом из ES-модулей (общий код — `src/shared/`, режимы — `src/modes/`; точка входа `src/modes/quest/main.js` или `src/modes/walk/main.js`, three.js через `import`) в один IIFE и встраивает его в `shell.html` — получается один HTML, который открывается через `file://`. Подробнее — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Как тестировать
 
@@ -74,14 +74,9 @@ npm run deploy      # ручной деплой через wrangler (минуя 
 
 ```
 ├── src/
-│   ├── shell.html     разметка и весь CSS, плейсхолдеры для скриптов
-│   ├── data.js        контент: предметы, документы, словарь, архив, Ecos, загадка
-│   ├── audio.js       процедурный звук и озвучка
-│   ├── world.js       3D-мир, текстуры, камеры, модель героя, пост-эффект
-│   ├── systems.js     сохранение, язык, инвентарь, архив, диалоги, загадка, интерфейс
-│   ├── screens.js     11 кадров и система активных точек
-│   └── game.js        сюжетные сценарии и класс Game
-├── versions/walk/src/ версия с ходьбой: shell.html, world.js, systems.js, game.js
+│   ├── shared/        общий код: data.js (контент), audio.js, textures.js, characters.js (модели персонажей),
+│   │                  world.js (зоны, камеры, постпроцесс), player.js, systems.js, scripts.js (сюжет), util.js
+│   └── modes/         различия режимов: frame/ (кадры и активные точки), quest/ и walk/ (Game, main.js, shell.html)
 ├── dist/              собранные игры: el-sueno.html, el-sueno-walk.html
 ├── tests/e2e.py       сквозной тест квеста (Playwright)
 ├── tests/e2e_walk.py, e2e_walk_mobile.py  тесты версии с ходьбой

@@ -41,8 +41,8 @@ flowchart LR
 | Старт | 100 | `SaveManager.fresh` |
 | Стук за дверью в переулке (первый раз) | −4 | `SCRIPTS.puertaCallejon` |
 | Толкнуть дверь с надписью «TIRA» | −6 | `SCRIPTS.puertaTienda` |
-| Неверный ответ в Eco | −7 | эхо в `game.js` |
-| Верный ответ в Eco | +18 | эхо в `game.js` |
+| Неверный ответ в Eco | −7 | эхо в `scripts.js` |
+| Верный ответ в Eco | +18 | эхо в `scripts.js` |
 | Выпить напиток | +12 | `Game.useItem` |
 | Погоня: «Parar» в первый раз | −8 | `Game.chaseSeq` |
 | Погоня: «¿Anselmo?» | −6 | `Game.chaseSeq` |
@@ -56,7 +56,7 @@ flowchart LR
 
 ## Карта сцен
 
-11 кадров из `src/screens.js`. Пунктир — переход с условием или со сценарием.
+11 кадров из `src/modes/frame/screens.js`. Пунктир — переход с условием или со сценарием.
 
 ```mermaid
 flowchart TD
@@ -198,7 +198,7 @@ flowchart TD
 
 ## Загадка с плитами
 
-Пьедестал у северной двери: четыре круглые плиты в порядке `PLATE_ORDER` = луна, рот, рука, глаз (`src/data.js`). Нужно нажать четыре плиты по очереди.
+Пьедестал у северной двери: четыре круглые плиты в порядке `PLATE_ORDER` = луна, рот, рука, глаз (`src/shared/data.js`). Нужно нажать четыре плиты по очереди.
 
 - Табличка: «PARA ENTRAR, REZA. PARA SALIR, REZA AL REVÉS.»
 - Молитва из ящика (`oracion`): «Primero, la mano apaga la luz. Después, la luna sube. Luego, el ojo se cierra. Al final, la boca calla.» → `PRAYER` = mano, luna, ojo, boca.

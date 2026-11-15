@@ -2,25 +2,28 @@
 
 ## Обзор
 
-Игра — один самодостаточный HTML-файл на версию. Код — ES-модули с явными `import`/`export`. `build.js` запускает esbuild (точная версия в `devDependencies`): bundle от `main.js` вместе с three.js (`import * as THREE from 'three'`, r149), формат IIFE, минификация, `target: es2020`. Результат встраивается в обычный `<script>` внутри `shell.html` (плейсхолдер `/*__GAME__*/`), поэтому файл работает через `file://`, без сервера и без `type="module"`.
+Игра — один самодостаточный HTML-файл на версию. Код — ES-модули с явными `import`/`export`: общий — в `src/shared/`, различия режимов — в `src/modes/`. `build.js` запускает esbuild (точная версия в `devDependencies`): bundle от `main.js` режима вместе с three.js (`import * as THREE from 'three'`, r149), формат IIFE, минификация, `target: es2020`. Результат встраивается в обычный `<script>` внутри `shell.html` (плейсхолдер `/*__GAME__*/`), поэтому файл работает через `file://`, без сервера и без `type="module"`.
 
 ```mermaid
 flowchart LR
-    subgraph src
-        shell[shell.html<br/>разметка + CSS]
-        main[main.js<br/>точка входа]
-        data[data.js] & audio[audio.js] & world[world.js] & systems[systems.js] & screens[screens.js] & game[game.js]
+    subgraph shared[src/shared — общий код]
+        util[util.js] & data[data.js] & audio[audio.js] & textures[textures.js] & characters[characters.js]
+        world[world.js] & player[player.js] & systems[systems.js] & scripts[scripts.js]
     end
-    three[node_modules/three<br/>r149]
+    subgraph modes[src/modes — различия]
+        frame[frame/screens.js<br/>кадры + активные точки]
+        quest[quest/ game.js main.js shell.html]
+        walk[walk/ game.js main.js interaction.js shell.html]
+    end
+    three[three r149]
     esb{{build.js<br/>esbuild: bundle, IIFE, minify}}
-    out[dist/el-sueno.html<br/>~570 KB]
-    main --> esb
-    data & audio & world & systems & screens & game & three -.->|import| esb
-    shell -->|/*__GAME__*/| esb
-    esb --> out
+    shared & three -.-> quest & walk
+    frame -.-> quest
+    quest -->|main.js + shell.html| esb --> q[dist/el-sueno.html]
+    walk -->|main.js + shell.html| esb --> w[dist/el-sueno-walk.html]
 ```
 
-Так же собирается версия с ходьбой: точка входа `versions/walk/src/main.js`, разметка `versions/walk/src/shell.html`; `data.js` и `audio.js` импортируются из `src/` (общие с квестом) → `dist/el-sueno-walk.html`. В ней нет `screens.js`: вместо кадров и активных точек — `InteractionSystem` (ближайший объект, луч от указателя), движение `Player.move` и погоня в реальном времени.
+Пока это две сборки с общим кодом: у квеста и версии с ходьбой свой класс `Game` (`src/modes/*/game.js`), разметка и точка входа. Следующий шаг — один рантайм-гибрид, где у сцены есть `mode: 'walk' | 'frame'` (см. `docs/ROADMAP.md`).
 
 `build.js` экранирует `</script` внутри бандла, чтобы встроенный скрипт не закрылся раньше времени, и использует функцию-заменитель в `String.replace`, чтобы `$` в коде не интерпретировался как шаблон подстановки. `package.json` объявляет `"type": "module"`: так `node --check` (хук после правки) понимает `import`, а `build.js` и `scripts/site.js` сами написаны как ESM.
 
@@ -28,17 +31,24 @@ flowchart LR
 
 ## Модули
 
-| Модуль | Импортирует | Экспортирует |
-|---|---|---|
-| `data.js` | — | `SAVE_KEYS`, `LEGACY_SAVE_KEY`, `SET_KEY`, `MAX_SLOTS`, `ZONES`, `ITEMS`, `DOCS`, `LEX`, `ARCHIVE`, `ECOS`, `SYMBOLS`, `PLATE_ORDER`, `PRAYER`, `SOLUTION` |
-| `audio.js` | — (Web Audio, `speechSynthesis`) | `AudioManager` |
-| `world.js` | `three`, `DOCS`, `SYMBOLS`, `clamp` | текстуры (`TEX`, `canvasTex`, `textTex`), `SceneManager`, `CAMS`, `CameraManager`, `Player`, `Gfx`, `zoneAt` |
-| `systems.js` | данные, `SCREENS` (квест) | хелперы `$`, `esc`, `clamp`; `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` (+ `InteractionSystem` в версии с ходьбой) |
-| `screens.js` | `three`, `$`, `esc`, `clamp` | `SCREENS`, `HotspotSystem` |
-| `game.js` | всё выше | `SCRIPTS`, `DRINKS`, класс `Game`, `game` (текущий экземпляр, live binding) |
-| `main.js` | `three`, `$`, `Game`, `game` | — (проверка WebGL, `new Game().boot()`, `window.__sueno`) |
+| Модуль | Что даёт |
+|---|---|
+| `shared/util.js` | `$`, `esc`, `clamp`, `PI`, `rng` (генератор с семенем) |
+| `shared/data.js` | контент: `ZONES`, `ITEMS`, `DOCS`, `LEX`, `ARCHIVE`, `ECOS`, `SYMBOLS`, `PLATE_ORDER`, `PRAYER`, `SOLUTION`; ключи `SAVE_KEYS`, `LEGACY_SAVE_KEY`, `SET_KEY`; `MAX_SLOTS` |
+| `shared/audio.js` | `AudioManager` (Web Audio, `speechSynthesis`) |
+| `shared/textures.js` | процедурные текстуры: `TEX`, `buildTextures`, `canvasTex`, `textTex`, `paintText`, `paintTextRaw`, `scaleBoxUV` |
+| `shared/characters.js` | модели персонажей: `buildHero`/`animateHero` (протагонист), `makeAnselmo`, `makeWatcher` (El Que Mira и тень) — только геометрия и анимация модели |
+| `shared/world.js` | `SceneManager` (зоны, свет, коллайдеры, интерактивные объекты `addInter`, `sync` по флагам), `zoneAt`, `CAMS`, `CameraManager`, `Gfx` (низкое разрешение + постпроцесс) |
+| `shared/player.js` | `Player`: позиция, движение относительно камеры, коллизии, фонарь; модель берёт из `characters.js` |
+| `shared/systems.js` | `SaveManager({ key, legacy, validScr })`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem` (выборы, в т. ч. на время), `PuzzleSystem`, `UIManager(game, { help, badge })` |
+| `shared/scripts.js` | `SCRIPTS` — сюжет, по async-функции на интерактивный объект; `DRINKS` |
+| `modes/frame/screens.js` | `SCREENS` (11 кадров) и `HotspotSystem` (кружки поверх проекции, панель переходов) |
+| `modes/quest/game.js` | `Game` квеста: кадры, переходы `goTo`, погоня `chaseSeq` через выборы на время, ввод по точкам; `game` (live binding) |
+| `modes/walk/game.js`, `interaction.js` | `Game` версии с ходьбой: WASD/джойстик, камеры по зонам, погоня в реальном времени; `InteractionSystem` (ближайший объект, луч от указателя) |
+| `modes/*/main.js` | проверка WebGL, `new Game().boot()`, `window.__sueno` |
+| `modes/*/shell.html` | разметка и CSS режима, плейсхолдер `/*__GAME__*/` |
 
-`SceneManager` обращается к игре через `this.game` (передаётся в конструктор), а не через глобальную переменную. Циклические импорты (`systems.js` ↔ `screens.js`, `world.js` → `systems.js`) безопасны: на верхнем уровне модули только объявляют, всё вызывается после загрузки. Действия на верхнем уровне — только регистрация сценариев фресок и Eco в `SCRIPTS` (`game.js`, использует `ECOS`).
+Общие модули импортируют только `shared/` (режимы — только сверху вниз). `SceneManager` обращается к игре через `this.game`. Действия на верхнем уровне — только регистрация сценариев фресок и Eco в `SCRIPTS` (`scripts.js`, использует `ECOS`).
 
 ```mermaid
 classDiagram
@@ -135,7 +145,7 @@ flowchart TD
 
 ## Сцены и активные точки
 
-`SCREENS` (`screens.js`) — 11 кадров. Кадр задаёт:
+`SCREENS` (`modes/frame/screens.js`) — 11 кадров. Кадр задаёт:
 
 - `cam` — id камеры из `CAMS`;
 - `at`, `ry` — где стоит и куда смотрит герой;

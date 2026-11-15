@@ -1,16 +1,14 @@
-import { SAVE_KEYS, LEGACY_SAVE_KEY, SET_KEY, MAX_SLOTS, ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS, SYMBOLS, PLATE_ORDER, PRAYER, SOLUTION } from './data.js';
-import { SCREENS } from './screens.js';
+import { $, esc, clamp } from './util.js';
+import { LEGACY_SAVE_KEY, SET_KEY, MAX_SLOTS, ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS, SYMBOLS, PLATE_ORDER, PRAYER, SOLUTION } from './data.js';
 /* =====================================================================
    SISTEMAS: guardado, idioma, inventario, archivo, diálogo, enigma,
    interacción e interfaz.
    ===================================================================== */
-export const $ = id => document.getElementById(id);
-export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-
 /* ---------- SaveManager: LocalStorage con validación y tolerancia a datos dañados ---------- */
 export class SaveManager {
-  constructor() { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {}; this.key = SAVE_KEYS.quest; this.migrate(); }
+  /** key: clave de la partida; legacy: heredar el guardado común antiguo; validScr: id de plano válido (quest). */
+  constructor({ key, legacy = false, validScr } = {}) { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {};
+    this.key = key; this.validScr = validScr || (() => false); if (legacy) this.migrate(); }
   /** El guardado común de antes (LEGACY_SAVE_KEY) pasa al quest y se borra: la versión de caminar empieza de cero. */
   migrate() { const old = this._get(LEGACY_SAVE_KEY); if (old === null) return; if (this._get(this.key) === null) this._set(this.key, old); try { this.ok ? localStorage.removeItem(LEGACY_SAVE_KEY) : delete this.mem[LEGACY_SAVE_KEY]; } catch (e) {} }
   _get(k) { try { return this.ok ? localStorage.getItem(k) : this.mem[k] || null; } catch (e) { return null; } }
@@ -26,7 +24,7 @@ export class SaveManager {
       b.inv = arr(s.inv, x => ITEMS[x]).slice(0, MAX_SLOTS); b.docs = arr(s.docs, x => DOCS[x]); b.archive = arr(s.archive, x => ARCHIVE[x]); b.ecos = arr(s.ecos, x => ECOS[x]);
       b.words = arr(s.words, x => typeof x === 'string'); b.decisions = arr(s.decisions, x => typeof x === 'string'); b.log = arr(s.log, x => x && typeof x.t === 'string').slice(-60);
       if (s.pos && isFinite(s.pos.x) && isFinite(s.pos.z)) b.pos = { x: clamp(+s.pos.x, -13, 23), z: clamp(+s.pos.z, -100, 2), ry: isFinite(s.pos.ry) ? +s.pos.ry : 0 };
-      if (typeof s.scr === 'string' && SCREENS[s.scr]) b.scr = s.scr; b.cordura = isFinite(s.cordura) ? clamp(+s.cordura, 10, 100) : 100; b.time = isFinite(s.time) ? +s.time : 0; b.tries = isFinite(s.tries) ? +s.tries : 0;
+      if (typeof s.scr === 'string' && this.validScr(s.scr)) b.scr = s.scr; b.cordura = isFinite(s.cordura) ? clamp(+s.cordura, 10, 100) : 100; b.time = isFinite(s.time) ? +s.time : 0; b.tries = isFinite(s.tries) ? +s.tries : 0;
       return b;
     } catch (e) { console.warn('Guardado dañado: se ignora.', e); try { this.ok && localStorage.removeItem(this.key); } catch (_) {} return null; }
   }
@@ -111,7 +109,8 @@ export class PuzzleSystem {
 
 /* ---------- UIManager ---------- */
 export class UIManager {
-  constructor(game) { this.game = game; this.modal = null; this.tab = 0; this.selItem = null; this.combine = false; this.selDoc = null; this.selArch = null; this.docRes = null; this.flashT = 0; this.bind(); }
+  /** help: ayuda de controles (HTML) del modo; badge: tecla/botón de acción junto al verbo. */
+  constructor(game, { help = '', badge = false } = {}) { this.game = game; this.help = help; this.badge = badge; this.modal = null; this.tab = 0; this.selItem = null; this.combine = false; this.selDoc = null; this.selArch = null; this.docRes = null; this.flashT = 0; this.bind(); }
   bind() { const g = this.game; document.addEventListener('pointerdown', () => { this.pdT = performance.now(); }, true);
     // un botón con foco se activaría con Espacio/Intro al avanzar el diálogo: se le quita el foco
     document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }, true);
@@ -127,7 +126,7 @@ export class UIManager {
       const en = g.lang.entry(w.dataset.k); if (!en) return; tip.innerHTML = `<b>${esc(en.k)}</b>${esc(en.d)}<em>«${esc(en.e)}»</em>`; tip.classList.remove('hidden'); w.classList.remove('new');
       const r = w.getBoundingClientRect(), tw = Math.min(290, window.innerWidth - 16); tip.style.left = clamp(r.left + r.width / 2 - tw / 2, 8, window.innerWidth - tw - 8) + 'px'; tip.style.top = ''; tip.style.bottom = (window.innerHeight - r.top + 8) + 'px';
       if (r.top < 150) { tip.style.bottom = ''; tip.style.top = (r.bottom + 8) + 'px'; } }, true);
-    $('keysHelp').innerHTML = 'Toca o pulsa los <b>círculos</b> para mirar, leer y hablar.<br>Las <b>flechas →</b> de abajo cambian de lugar.<br><b>E</b> o <b>Espacio</b> seguir · <b>1–9</b> elegir · <b>Tab</b> inventario<br><b>J</b> cuaderno · <b>F</b> linterna · <b>M</b> silencio · <b>Esc</b> pausa<br>Toca una palabra subrayada para ver qué significa.';
+    $('keysHelp').innerHTML = this.help;
   }
   /* Tras abrir un panel con un toque, el «click» sintético del mismo toque cae sobre el panel: se ignora un instante. */
   guard() { this.openT = performance.now(); }
@@ -137,7 +136,7 @@ export class UIManager {
   zone(z) { const el = $('zona'); el.innerHTML = `<small>${z.n}</small>${esc(z.name)}`; el.style.opacity = 1; clearTimeout(this.zt); this.zt = setTimeout(() => { el.style.opacity = 0; }, 3200); }
   flash(t) { this.flashTxt = t; this.flashT = performance.now() + 1400; }
   prompt(verb, near) { const el = $('prompt'), now = performance.now(); let html = null;
-    if (this.flashT > now) html = esc(this.flashTxt); else if (verb) html = esc(verb);
+    if (this.flashT > now) html = esc(this.flashTxt); else if (verb) html = this.badge && near ? `<b>${document.body.classList.contains('touch') ? '◉' : 'E'}</b>${esc(verb)}` : esc(verb);
     if (html !== this._p) { this._p = html; if (html) el.innerHTML = html; el.style.opacity = html ? 1 : 0; } }
   estado(c, threat) { const lab = threat > 0.3 ? 'Pánico' : c > 70 ? 'Tranquilo' : c > 40 ? 'Nervioso' : c > 15 ? 'Miedo' : 'Pánico'; if (lab !== this._e) { this._e = lab; $('estadoTxt').textContent = lab; }
     const p = $('pupila'); p.setAttribute('r', (1.6 + 2.8 * c / 100 - threat).toFixed(2)); p.setAttribute('fill', c < 40 || threat > 0.3 ? '#a8351f' : '#8f8a80'); $('parpado').style.display = 'none'; }

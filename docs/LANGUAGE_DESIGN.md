@@ -64,7 +64,7 @@
 
 ## Словарь (LEX)
 
-76 статей в `src/data.js`. Формат: `[ключ, 'формы через пробел', определение, пример]`. Формы — это словоформы, как они встречаются в текстах; по ним `LanguageSystem` находит слово в любой строке.
+76 статей в `src/shared/data.js`. Формат: `[ключ, 'формы через пробел', определение, пример]`. Формы — это словоформы, как они встречаются в текстах; по ним `LanguageSystem` находит слово в любой строке.
 
 mirar, atrás, ciudad, vacío, dormir, sueño, soñar, despierto, luz, oscuro, puerta, llave, cerrado, cerrar, abrir, miedo, solo, buscar, hombre, sed, beber, moneda, máquina, refresco, naranja, limón, agua, tienda, cajón, empujar, tirar, entrar, salir, rezar, oración, al revés, primero, después, luego, al final, mano, luna, ojo, boca, apagar, encender, callar, subir, mentir, verdad, paciente, hospital, médico, enfermo, niebla, calle, plaza, pasaje, farolero, pilas, linterna, teléfono, noche, nadie, alguien, vecino, frío, viejo, venda, norte, habitación, sufrir, necesitar, querer, cama, pulsera.
 

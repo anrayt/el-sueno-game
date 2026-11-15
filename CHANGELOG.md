@@ -5,6 +5,7 @@
 ## [Не выпущено]
 
 ### Добавлено
+- Общий код двух версий — `src/shared/` (`util`, `data`, `audio`, `textures`, `characters`, `world`, `player`, `systems`, `scripts`), различия — `src/modes/` (`frame/screens.js`, `quest/`, `walk/`). `versions/` удалён. Модели персонажей (герой, Anselmo, El Que Mira) вынесены в `src/shared/characters.js`. `SaveManager` и `UIManager` получили параметры режима (`key`, `legacy`, `validScr`; `help`, `badge`). В версии с ходьбой теперь тоже снимается фокус с кнопок после клика (раньше только в квесте), а у `DialogueSystem` есть выборы на время (используются только квестом).
 - ES-модули и esbuild (`0.28.2`, точная версия): явные `import`/`export`, точки входа `src/main.js` и `versions/walk/src/main.js`, three.js через `import` (tree-shaking, минификация: ~570 KB вместо ~770 KB). По-прежнему один HTML на версию, работает через `file://`. `package.json`: `"type": "module"`. `SceneManager` использует `this.game` вместо глобального `game`. Тесты читают версию three из `__sueno.three`, ключи сохранений — литералами.
 - Тег `v0.2-pre-hybrid` — состояние перед гибридом. Playwright MCP закреплён на `0.0.85`.
 - Версия с ходьбой в репозитории: актуальные исходники (новый герой, фикс повторного срабатывания пробела, мягкая цветокоррекция страха) в `versions/walk/src/`; `src/data.js` и `src/audio.js` общие с квестом. `npm run build` собирает `dist/el-sueno.html` и `dist/el-sueno-walk.html`.

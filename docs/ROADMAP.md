@@ -12,19 +12,32 @@
 
 | Где | Что | Примечание |
 |---|---|---|
-| `src/world.js`, `Player.move` | движение с коллизиями | `Player.update` вызывается с нулевым вводом и `canMove = false` |
-| `src/world.js`, `SceneManager` | `colliders`, `circles`, `col()`, вызовы `this.col(...)` в `build`, `wall()` регистрирует коллайдер | используются только `Player.move` |
-| `src/world.js`, `CAMS` | поля `test` | `CameraManager.update` использует их как запасной вариант, если у кадра нет камеры; у всех 11 кадров камера задана |
-| `src/world.js`, `Player.update` | `fwd`/`right`, бег, шаги (`stepCb`), фаза походки | `Game.boot` назначает `stepCb`; шаги при переходах играются в `Game.goTo` напрямую |
-| `src/shell.html` | `#touch`, `#joy`, `#joyK`, `#btnA`, `#btnR` и их CSS | скрыты `#touch{display:none!important}` |
-| `src/systems.js`, `UIManager.showEnd` | `$('touch').classList.add('hidden')` | — |
-| `src/game.js`, конструктор `Game` | `keys`, `joy`, `runT`, `chase` | нигде не читаются |
+| `src/shared/player.js`, `Player.move` | движение с коллизиями | `Player.update` вызывается с нулевым вводом и `canMove = false` |
+| `src/shared/world.js`, `SceneManager` | `colliders`, `circles`, `col()`, вызовы `this.col(...)` в `build`, `wall()` регистрирует коллайдер | используются только `Player.move` |
+| `src/shared/world.js`, `CAMS` | поля `test` | `CameraManager.update` использует их как запасной вариант, если у кадра нет камеры; у всех 11 кадров камера задана |
+| `src/shared/player.js`, `Player.update` | `fwd`/`right`, бег, шаги (`stepCb`), фаза походки | `Game.boot` назначает `stepCb`; шаги при переходах играются в `Game.goTo` напрямую |
+| `src/modes/quest/shell.html` | `#touch`, `#joy`, `#joyK`, `#btnA`, `#btnR` и их CSS | скрыты `#touch{display:none!important}` |
+| `src/shared/systems.js`, `UIManager.showEnd` | `$('touch').classList.add('hidden')` | — |
+| `src/modes/quest/game.js`, конструктор `Game` | `keys`, `joy`, `runT`, `chase` | нигде не читаются |
 | `tests/e2e.py` | проверка «sin controles de movimiento en pantalla» | проверяет, что `#touch` скрыт; в гибридном режиме — проверять по зонам |
-| `src/game.js`, `Game.saveNow` | `state.pos` | позиция определяется кадром (`state.scr`); поле можно оставить ради совместимости формата сохранения |
+| `src/modes/quest/game.js`, `Game.saveNow` | `state.pos` | позиция определяется кадром (`state.scr`); поле можно оставить ради совместимости формата сохранения |
 
 ### 2. ~~Глобальная область видимости → ES-модули~~ — сделано
 
 ES-модули с явными `import`/`export`, esbuild, по-прежнему один HTML на версию (см. [ARCHITECTURE](ARCHITECTURE.md#обзор)). Следующий шаг — общий код в `src/shared/` и гибрид ходьбы и кадров.
+
+### 2а. Гибрид ходьбы и кадров (согласовано 15.11.2026)
+
+Целевая версия — одна сборка на `/`. У каждой сцены `mode: 'walk' | 'frame'`; `Game` при смене сцены переключает ввод, камеру, HUD и активные точки.
+
+- **walk** (свободная ходьба): callejón, plaza, pasaje (погоня в реальном времени, «no mires atrás»), подход к puerta.
+- **frame** (статичный кадр с активными точками): tienda, quiosco вблизи, cabina, banco (Anselmo), pedestal.
+- Вход в кадр — дверь/триггер или клик/`E` по объекту, с затемнением; выход возвращает на улицу в точку входа.
+- Тач в walk-сценах: тап по земле — герой идёт к точке (простой обход коллайдеров); джойстик — опция.
+- Режимы — настройки одного рантайма: «Modo: normal» (гибрид, по умолчанию) и «Modo lectura» (все сцены — кадры; погоня через выборы на время, `chaseSeq`). Текущие сборки (квест, ходьба) получаются как частные случаи.
+- Одно сохранение на гибрид (`v: 2`) с миграцией из сохранений квеста и ходьбы.
+- Перед началом поставлен тег `v0.2-pre-hybrid`.
+- Порядок: ESM + esbuild (сделано) → `src/shared/` + `characters.js` (сделано) → сцены с `mode` и гибрид → тесты гибрида и документация.
 
 ### 3. Тестирование на реальных устройствах
 

@@ -10,10 +10,10 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 | Версия | Исходники | Сборка | Онлайн | Управление |
 |---|---|---|---|---|
-| **Основная — квест** | `src/` | `dist/el-sueno.html` | `/` | Фиксированные кадры, активные точки, выборы. Тап/клик, без ходьбы |
-| **Альтернативная — с ходьбой** | `versions/walk/src/` + общие `src/data.js`, `src/audio.js` | `dist/el-sueno-walk.html` | `/walk/` | Свободная ходьба (WASD/стрелки, джойстик на телефоне), камеры меняются по зонам, погоня в реальном времени |
+| **Основная — квест** | `src/modes/quest/` + `src/modes/frame/` | `dist/el-sueno.html` | `/` | Фиксированные кадры, активные точки, выборы. Тап/клик, без ходьбы |
+| **Альтернативная — с ходьбой** | `src/modes/walk/` | `dist/el-sueno-walk.html` | `/walk/` | Свободная ходьба (WASD/стрелки, джойстик на телефоне), камеры меняются по зонам, погоня в реальном времени |
 
-Сюжет, контент, мир и звук общие. `data.js` и `audio.js` у версий один и тот же файл (`src/`). `world.js` и `systems.js` почти совпадают, но скопированы. `game.js` и `shell.html` отличаются сильно: в версии с ходьбой ввод джойстиком, `InteractionSystem` и погоня в реальном времени, в квесте `screens.js` и погоня через выборы. Правка в `world.js`/`systems.js`/`SCRIPTS` пока делается в двух местах — см. техдолг.
+Сюжет (`SCRIPTS`), контент, мир, персонажи, звук и системы — общий код в `src/shared/`. Различаются только класс `Game`, разметка и ввод (`src/modes/`). Следующий шаг — гибрид в одной сборке: у каждой сцены `mode: 'walk' | 'frame'` (план согласован, см. `docs/ROADMAP.md`).
 
 ## Сборка и деплой
 
@@ -24,15 +24,18 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 ## Архитектура (`src/`)
 
-| Файл | Содержимое |
+Подробно — `docs/ARCHITECTURE.md`. Коротко:
+
+| Модуль | Содержимое |
 |---|---|
-| `shell.html` | HTML-разметка, весь CSS, плейсхолдеры `/*__THREE__*/` и `/*__GAME__*/` |
-| `data.js` | Контент: `ZONES`, `ITEMS`, `DOCS`, `LEX` (76 слов с определениями на простом испанском), `ARCHIVE`, `ECOS`, символы и решение загадки; ключи сохранений `SAVE_KEYS` |
-| `audio.js` | `AudioManager` — весь звук процедурный (Web Audio); озвучка через `speechSynthesis` (es-ES) |
-| `world.js` | Процедурные текстуры, `SceneManager` (5 зон, свет, `addInter`), `CAMS` и `CameraManager`, `Player` (модель героя), `Gfx` (низкое разрешение + пост-шейдер) |
-| `systems.js` | `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` |
-| `screens.js` | Только квест: `SCREENS` — 11 кадров и `HotspotSystem` |
-| `game.js` | `SCRIPTS` — сюжет; класс `Game` (состояние, флаги, переходы, погоня, обморок, финал, цикл, ввод) |
+| `shared/data.js` | Контент: `ZONES`, `ITEMS`, `DOCS`, `LEX` (76 слов), `ARCHIVE`, `ECOS`, символы и решение загадки; ключи сохранений `SAVE_KEYS` |
+| `shared/audio.js` | `AudioManager` — процедурный звук (Web Audio), озвучка `speechSynthesis` (es-ES) |
+| `shared/textures.js`, `characters.js` | Процедурные текстуры; модели героя, Anselmo и El Que Mira |
+| `shared/world.js`, `player.js` | `SceneManager` (5 зон, `addInter`, `sync`), `CAMS`/`CameraManager`, `Gfx`; `Player` (движение, коллизии, фонарь) |
+| `shared/systems.js` | `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` |
+| `shared/scripts.js` | `SCRIPTS` — сюжет: по async-функции на каждую активную точку |
+| `modes/frame/screens.js` | `SCREENS` — 11 кадров и `HotspotSystem` |
+| `modes/quest/`, `modes/walk/` | Класс `Game` режима, `main.js`, `shell.html`; у ходьбы ещё `interaction.js` |
 
 Состояние = `state.flags` + инвентарь, документы, слова, архив, эхо, решения, кадр (квест) или позиция (ходьба). `SceneManager.sync(flags)` идемпотентно приводит мир в соответствие с флагами — так восстанавливается сохранение.
 
@@ -51,11 +54,11 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 ## Harness Claude Code
 
-`AGENTS.md`, `CLAUDE.md`, `.claude/` (агенты `spanish-editor`, `lore-keeper`, `playtester`, `code-reviewer`; скиллы `new-content`, `new-chapter`, `playtest`, `deploy`, `espanol-del-sueno`; хуки: правка `dist/` блокируется, после правки `src/`/`versions/` — `node --check` и сборка), `.mcp.json` (Playwright MCP).
+`AGENTS.md`, `CLAUDE.md`, `.claude/` (агенты `spanish-editor`, `lore-keeper`, `playtester`, `code-reviewer`; скиллы `new-content`, `new-chapter`, `playtest`, `deploy`, `espanol-del-sueno`; хуки: правка `dist/` блокируется, после правки `src/` — `node --check` и сборка), `.mcp.json` (Playwright MCP).
 
 ## Технический долг
 
-- **Главное:** вынести общий код двух версий (`world.js`, большую часть `systems.js` и `SCRIPTS`) в `src/shared/`, а различия (ввод, камеры, погоня, HUD) — в `src/modes/quest/` и `src/modes/walk/`; модели персонажей — в `src/shared/characters.js`. Тогда контент новых глав пишется один раз.
+- **Главное:** гибрид в одной сборке — улицы с ходьбой, интерьеры и разговоры в кадрах, режимы «normal» и «lectura» как настройки (см. `docs/ROADMAP.md`).
 - В квест-версии остался код ходьбы (`Player.move`, коллайдеры, `test` у `CAMS`, скрытые `#joy`/`#btnA`/`#btnR`, поля `keys`/`joy`/`runT`). **Не удалять**: при объединении он уйдёт в общий модуль.
 - В реальном Safari (macOS/iOS) и на реальных Android-устройствах не проверялось.
 - Уровни A2–B1 ещё не реализованы, это задача следующих глав (II — El Hospital).

@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */src/*|*/versions/*) case \"$f\" in *.js) if ! err=$(node --check \"$f\" 2>&1); then echo \"$err\" | head -8 >&2; exit 2; fi;; esac; out=$(npm run build --silent 2>&1) || { echo \"Сборка упала после правки $f:\" >&2; echo \"$out\" | tail -20 >&2; exit 2; };; esac; exit 0"
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */src/*) case \"$f\" in *.js) if ! err=$(node --check \"$f\" 2>&1); then echo \"$err\" | head -8 >&2; exit 2; fi;; esac; out=$(npm run build --silent 2>&1) || { echo \"Сборка упала после правки $f:\" >&2; echo \"$out\" | tail -20 >&2; exit 2; };; esac; exit 0"
           }
         ]
       }

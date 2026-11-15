@@ -4,7 +4,7 @@
 
 ## Команды
 
-- `npm run build` — собрать обе версии в `dist/`: `el-sueno.html` (квест, `src/`) и `el-sueno-walk.html` (ходьба, `versions/walk/src/` + общие `src/data.js`, `src/audio.js`)
+- `npm run build` — собрать обе версии в `dist/`: `el-sueno.html` (квест, `src/modes/quest/`) и `el-sueno-walk.html` (ходьба, `src/modes/walk/`); общий код — `src/shared/`
 - `npm test` / `npm run test:mobile` — сквозное прохождение квест-версии (~10 мин каждый)
 - `npm run test:walk` — сквозное прохождение версии с ходьбой (`tests/e2e_walk.py`) и тач-управление (`tests/e2e_walk_mobile.py`)
 - `npm run test:saves` — сохранения квеста и ходьбы не мешают друг другу, миграция старого общего сохранения
