@@ -18,7 +18,7 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 ## Сборка и деплой
 
 - `npm install` (ставит three@0.149.0), затем `npm run build` → обе версии в `dist/`. Каждая — **один** HTML без внешних зависимостей, открывается двойным кликом (`file://`).
-- `build.js` склеивает `shell.html` + `three.min.js` + скрипты версии. Порядок файлов важен: всё лежит в глобальной области, модулей нет.
+- Код — ES-модули. `build.js` пакует esbuild'ом `main.js` версии вместе с three.js в IIFE и встраивает в `shell.html`. Глобальных объявлений нет; для тестов есть `window.__sueno`.
 - `npm run build:site` → `site/` для Cloudflare Pages (`index.html`, `walk/index.html`, `_headers`, `404.html`).
 - CI (`.github/workflows/ci.yml`): push в `main` → деплой на https://el-sueno.pages.dev (не ждёт e2e); PR → preview-деплой и ссылка в PR; e2e на push и PR. Подробно — `docs/DEPLOY.md`.
 
@@ -56,7 +56,6 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 ## Технический долг
 
 - **Главное:** вынести общий код двух версий (`world.js`, большую часть `systems.js` и `SCRIPTS`) в `src/shared/`, а различия (ввод, камеры, погоня, HUD) — в `src/modes/quest/` и `src/modes/walk/`; модели персонажей — в `src/shared/characters.js`. Тогда контент новых глав пишется один раз.
-- Всё в глобальной области видимости; план — ES-модули на esbuild с тем же результатом (один HTML на версию, `file://`).
 - В квест-версии остался код ходьбы (`Player.move`, коллайдеры, `test` у `CAMS`, скрытые `#joy`/`#btnA`/`#btnR`, поля `keys`/`joy`/`runT`). **Не удалять**: при объединении он уйдёт в общий модуль.
 - В реальном Safari (macOS/iOS) и на реальных Android-устройствах не проверялось.
 - Уровни A2–B1 ещё не реализованы, это задача следующих глав (II — El Hospital).

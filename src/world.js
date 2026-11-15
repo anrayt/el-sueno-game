@@ -1,3 +1,6 @@
+import * as THREE from 'three';
+import { DOCS, SYMBOLS } from './data.js';
+import { clamp } from './systems.js';
 /* =====================================================================
    MUNDO: texturas procedurales, geometría, luces, cámaras fijas, jugador.
    Mapa (metros, -Z = norte):
@@ -7,22 +10,22 @@
      Pasaje    x[-2,2]      z[-74,-48]
      Puerta    x[-5,5]      z[-84,-74]   (verja en z=-84)
    ===================================================================== */
-const PI = Math.PI;
-function rng(seed) { return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; }
-function canvasTex(w, h, draw, clamp) {
+export const PI = Math.PI;
+export function rng(seed) { return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; }
+export function canvasTex(w, h, draw, clamp) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); if (!clamp) t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 2; return t;
 }
 /* manchas, suciedad y ruido comunes a todas las superficies */
-function grime(g, w, h, R, n, cols, rmin, rmax, a) {
+export function grime(g, w, h, R, n, cols, rmin, rmax, a) {
   for (let i = 0; i < n; i++) { const x = R() * w, y = R() * h, r = rmin + R() * (rmax - rmin); const gr = g.createRadialGradient(x, y, 0, x, y, r);
     const c = cols[Math.floor(R() * cols.length)]; gr.addColorStop(0, `rgba(${c},${a * (0.4 + R() * 0.6)})`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
 }
-function speckle(g, w, h, R, n, lo, hi, a) { for (let i = 0; i < n; i++) { const v = Math.floor(lo + R() * (hi - lo)); g.fillStyle = `rgba(${v},${v},${v},${a})`; g.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } }
-function drips(g, w, h, R, n, col, a) { for (let i = 0; i < n; i++) { const x = R() * w, y = R() * h * 0.7, l = 30 + R() * h * 0.4, ww = 2 + R() * 9; const gr = g.createLinearGradient(0, y, 0, y + l); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x, y, ww, l); } }
+export function speckle(g, w, h, R, n, lo, hi, a) { for (let i = 0; i < n; i++) { const v = Math.floor(lo + R() * (hi - lo)); g.fillStyle = `rgba(${v},${v},${v},${a})`; g.fillRect(R() * w, R() * h, 1 + R() * 2, 1 + R() * 2); } }
+export function drips(g, w, h, R, n, col, a) { for (let i = 0; i < n; i++) { const x = R() * w, y = R() * h * 0.7, l = 30 + R() * h * 0.4, ww = 2 + R() * 9; const gr = g.createLinearGradient(0, y, 0, y + l); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x, y, ww, l); } }
 
-const TEX = {};
-function buildTextures() {
+export const TEX = {};
+export function buildTextures() {
   TEX.asphalt = canvasTex(512, 512, (g, w, h) => { const R = rng(11); g.fillStyle = '#2b2b2c'; g.fillRect(0, 0, w, h); speckle(g, w, h, R, 9000, 20, 90, 0.5);
     grime(g, w, h, R, 26, ['8,8,10', '14,13,12'], 30, 130, 0.75); g.strokeStyle = 'rgba(5,5,5,.8)'; g.lineWidth = 1.5;
     for (let i = 0; i < 9; i++) { g.beginPath(); let x = R() * w, y = R() * h; g.moveTo(x, y); for (let k = 0; k < 9; k++) { x += (R() - 0.5) * 70; y += (R() - 0.5) * 70; g.lineTo(x, y); } g.stroke(); } });
@@ -68,11 +71,11 @@ function buildTextures() {
   TEX.fog = canvasTex(128, 128, (g, w, h) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, true);
 }
 /* textura con texto pintado (pintadas, carteles, rótulos) */
-function textTex(lines, o = {}) {
+export function textTex(lines, o = {}) {
   const w = o.w || 512, h = o.h || 256;
   return canvasTex(w, h, g => paintText(g, w, h, lines, o), true);
 }
-function paintText(g, w, h, lines, o) {
+export function paintText(g, w, h, lines, o) {
   g.clearRect(0, 0, w, h); if (o.bg) { g.fillStyle = o.bg; g.fillRect(0, 0, w, h); }
   const R = rng(o.seed || 7); const fs = o.size || 64; g.font = `${o.weight || 'bold'} ${fs}px ${o.font || 'Impact, "Arial Narrow Bold", "Helvetica Neue", Arial, sans-serif'}`; g.textAlign = 'center'; g.textBaseline = 'middle';
   lines.forEach((ln, i) => { const y = h / 2 + (i - (lines.length - 1) / 2) * fs * 1.15; g.fillStyle = o.color || '#8f2a18';
@@ -82,10 +85,10 @@ function paintText(g, w, h, lines, o) {
 }
 
 /* ---------- utilidades de geometría ---------- */
-function scaleBoxUV(geo, w, h, d, s) { const uv = geo.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+export function scaleBoxUV(geo, w, h, d, s) { const uv = geo.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
   for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const k = f * 4 + i; uv.setXY(k, uv.getX(k) * dims[f][0] / s[0], uv.getY(k) * dims[f][1] / s[1]); } }
 
-class SceneManager {
+export class SceneManager {
   constructor(game) {
     this.game = game; this.scene = new THREE.Scene(); this.colliders = []; this.circles = []; this.inter = []; this.d = {}; this.flick = []; this.motes = [];
     this.fogBase = new THREE.Color(0x1b1d1e); this.fogRed = new THREE.Color(0x2a1512);
@@ -147,11 +150,11 @@ class SceneManager {
     this.addInter('grafiti', -1.7, -14.5, { verb: 'Leer', hx: -2.35, hit: [0.3, 1.6, 3.2], y: 1.7 });
     // nota y linterna
     d.nota = this.P(0.3, 0.22, this.mat(null, 0xb0a888), -0.9, 0.02, -4.2, 0.5, -PI / 2);
-    this.addInter('nota', -0.9, -4.2, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !game.f.doc_nota });
+    this.addInter('nota', -0.9, -4.2, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !this.game.f.doc_nota });
     d.linterna = new THREE.Group(); d.linterna.position.set(0.95, 0.06, -7.3); d.linterna.rotation.y = 0.7; S.add(d.linterna);
     this.C(0.045, 0.045, 0.26, M.metal, 0, 0, 0, { p: d.linterna, rz: PI / 2 }); this.C(0.07, 0.05, 0.08, M.rust, 0.16, 0, 0, { p: d.linterna, rz: -PI / 2 });
-    this.addInter('linterna', 0.95, -7.3, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !game.f.got_linterna });
-    this.addInter('eco1', -1.3, -18, { verb: 'Escuchar', y: 1.3, eco: true, on: () => game.ecoOn('eco1') });
+    this.addInter('linterna', 0.95, -7.3, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !this.game.f.got_linterna });
+    this.addInter('eco1', -1.3, -18, { verb: 'Escuchar', y: 1.3, eco: true, on: () => this.game.ecoOn('eco1') });
 
     /* ================= LA PLAZA ================= */
     ground(26, 26, M.cobble, 0, -35, 5);
@@ -191,7 +194,7 @@ class SceneManager {
     bench(-6.6, -42, PI / 2); this.col(-6.95, -43, -6.25, -41); bench(4.5, -39.4, -0.4); this.col(3.6, -39.9, 5.4, -38.9); bench(-10.5, -33, PI / 2); this.col(-10.85, -34, -10.15, -32);
     // fuente seca
     this.C(1.7, 1.8, 0.55, M.stone, 6, 0.28, -30, { seg: 10 }); this.C(1.45, 1.45, 0.1, M.dark, 6, 0.5, -30, { seg: 10 }); this.C(0.22, 0.32, 1.5, M.stone, 6, 1.0, -30); this.C(0.7, 0.2, 0.2, M.stone, 6, 1.8, -30, { seg: 10 });
-    this.circles.push({ x: 6, z: -30, r: 1.95 }); this.addInter('eco2', 4.1, -31.6, { verb: 'Escuchar', y: 1.3, eco: true, on: () => game.ecoOn('eco2') });
+    this.circles.push({ x: 6, z: -30, r: 1.95 }); this.addInter('eco2', 4.1, -31.6, { verb: 'Escuchar', y: 1.3, eco: true, on: () => this.game.ecoOn('eco2') });
     // árboles muertos
     const tree = (x, z, s) => { const g = new THREE.Group(); g.position.set(x, 0, z); S.add(g); this.C(0.09 * s, 0.2 * s, 3.4 * s, M.dark, 0, 1.7 * s, 0, { p: g, seg: 6 }); const R = rng(Math.floor(x * 31 + z * 7 + 99));
       for (let i = 0; i < 7; i++) { const l = (0.8 + R() * 1.4) * s, b = this.C(0.015, 0.06 * s, l, M.dark, 0, (2 + R() * 1.5) * s, 0, { p: g, seg: 5 }); b.rotation.set((R() - 0.5) * 1.8, R() * 6.3, (R() - 0.5) * 1.8); b.translateY(l / 2); }
@@ -206,16 +209,16 @@ class SceneManager {
     this.P(0.5, 0.36, this.mat(null, 0xa89c74), -0.06, 1.55, 1.0, -PI / 2, 0, d.shopDoor);
     this.P(0.44, 0.16, new THREE.MeshLambertMaterial({ map: textTex(['TIRA'], { w: 128, h: 48, size: 38, color: '#1a1612', bg: '#b0a078' }) }), -0.06, 1.06, 1.62, -PI / 2, 0, d.shopDoor);
     this.B(0.04, 0.22, 0.05, M.metal, -0.07, 1.06, 1.85, { p: d.shopDoor });
-    d.shopDoorCol = this.col(12.9, -35, 13.4, -33, () => !game.f.tiendaAbierta);
-    this.addInter('puertaTienda', 12.3, -34, { verb: 'Abrir', hx: 13.0, hit: [0.5, 2.2, 2.0], on: () => !game.f.tiendaAbierta });
+    d.shopDoorCol = this.col(12.9, -35, 13.4, -33, () => !this.game.f.tiendaAbierta);
+    this.addInter('puertaTienda', 12.3, -34, { verb: 'Abrir', hx: 13.0, hit: [0.5, 2.2, 2.0], on: () => !this.game.f.tiendaAbierta });
     // sombra lejana en la boca del pasaje
     d.sombra = this.makeWatcher(0.75); d.sombra.position.set(0.3, 0, -49.6); S.add(d.sombra);
-    this.addInter('sombra', 0.3, -49.6, { verb: 'Mirar', r: 0, hit: [1.2, 2.4, 1.2], y: 1.2, far: true, noGlint: true, on: () => !game.f.sombraVista });
+    this.addInter('sombra', 0.3, -49.6, { verb: 'Mirar', r: 0, hit: [1.2, 2.4, 1.2], y: 1.2, far: true, noGlint: true, on: () => !this.game.f.sombraVista });
     // Anselmo, el farolero
     d.anselmo = this.makeAnselmo(); d.anselmo.position.set(-6.5, 0, -42); d.anselmo.rotation.y = PI / 2; S.add(d.anselmo);
     d.vendaObj = this.B(0.5, 0.03, 0.1, M.venda, -6.5, 0.51, -42, { ry: 0.5 });
-    this.addInter('anselmo', -5.5, -42, { verb: 'Hablar', y: 1.1, hx: -6.4, hit: [0.9, 1.6, 0.9], on: () => !game.f.puertaAbierta });
-    this.addInter('venda', -5.6, -42, { verb: 'Mirar', y: 0.6, hx: -6.4, hit: [0.8, 0.7, 0.8], on: () => !!game.f.puertaAbierta });
+    this.addInter('anselmo', -5.5, -42, { verb: 'Hablar', y: 1.1, hx: -6.4, hit: [0.9, 1.6, 0.9], on: () => !this.game.f.puertaAbierta });
+    this.addInter('venda', -5.6, -42, { verb: 'Mirar', y: 0.6, hx: -6.4, hit: [0.8, 0.7, 0.8], on: () => !!this.game.f.puertaAbierta });
 
     /* ================= LA TIENDA ================= */
     ground(9.7, 10, M.tile, 18.15, -34, 2, 0.005); const ceil = this.P(9.7, 10, this.mat(TEX.plaster, 0x555555), 18.15, 3.2, -34, 0, PI / 2);
@@ -229,7 +232,7 @@ class SceneManager {
     d.radioLed = this.B(0.03, 0.03, 0.02, M.bulbRed, 18.05, 1.22, -36.91);
     this.addInter('radio', 17.9, -36.1, { verb: 'Escuchar', y: 1.2, hz: -37, hit: [0.7, 0.6, 0.6] });
     d.cajon = this.B(0.9, 0.24, 0.7, M.wood, 16.4, 0.72, -36.93); d.cajonKnob = this.B(0.2, 0.03, 0.03, M.metal, 16.4, 0.72, -36.56);
-    this.addInter('cajon', 16.4, -36.1, { verb: 'Abrir', y: 0.75, hz: -36.75, hit: [1.0, 0.5, 0.6], on: () => !game.f.cajonVacio });
+    this.addInter('cajon', 16.4, -36.1, { verb: 'Abrir', y: 0.75, hz: -36.75, hit: [1.0, 0.5, 0.6], on: () => !this.game.f.cajonVacio });
     // estanterías con productos
     const shelf = (x, z, w, ry, seed) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; S.add(g); const R = rng(seed);
       this.B(w, 1.9, 0.05, M.metal, 0, 0.95, -0.2, { p: g }); [0.25, 0.75, 1.25, 1.75].forEach(y => { this.B(w, 0.04, 0.42, M.metal, 0, y, 0, { p: g });
@@ -239,7 +242,7 @@ class SceneManager {
     shelf(17.5, -32.75, 3.6, 0, 13); shelf(17.5, -33.05, 3.6, PI, 17); this.col(15.7, -33.3, 19.3, -32.5);
     shelf(22.72, -31.4, 3.0, -PI / 2, 21); this.col(22.4, -32.9, 23, -29.9);
     d.pilas = this.B(0.16, 0.1, 0.1, this.matc(0xa07a28), 17.1, 1.32, -32.55);
-    this.addInter('pilas', 17.1, -32.0, { verb: 'Coger', y: 1.3, hz: -32.6, hit: [0.6, 0.5, 0.5], on: () => !game.f.got_pilas });
+    this.addInter('pilas', 17.1, -32.0, { verb: 'Coger', y: 1.3, hz: -32.6, hit: [0.6, 0.5, 0.5], on: () => !this.game.f.got_pilas });
     // máquina de bebidas
     const mq = new THREE.Group(); mq.position.set(21.4, 0, -38.45); S.add(mq); this.B(1.1, 2.0, 0.8, M.metal, 0, 1.0, 0, { p: mq });
     const mt = canvasTex(256, 512, (g, w, h) => { g.fillStyle = '#0c1210'; g.fillRect(0, 0, w, h); const cs = ['#3a6a7a', '#5a3a22', '#b8641e', '#b0a030'], ns = ['AGUA', 'CAFÉ', 'NARANJA', 'LIMÓN'];
@@ -251,7 +254,7 @@ class SceneManager {
     decal(textTex(['NOVIEMBRE', '7  7  7  7  7  7  7', '7  7  7  7  7  7  7', '7  7  7  7  7  7  7'], { w: 256, h: 256, size: 30, color: '#2a221a', bg: '#b8ad90', font: 'Georgia, serif' }), 0.6, 0.6, 19.6, 1.75, -38.98, 0);
     this.addInter('calendario', 19.6, -38.2, { verb: 'Leer', y: 1.75, hz: -38.8, hit: [0.8, 0.8, 0.4] });
     this.B(0.45, 0.9, 0.45, M.wood, 20.2, 0.2, -31.2, { rz: PI / 2, ry: 0.5 }); this.B(0.7, 0.5, 0.6, M.cloth2, 14.4, 0.25, -38.3, { ry: 0.2 }); this.B(0.5, 0.4, 0.5, M.cloth2, 14.3, 0.7, -38.35, { ry: -0.3 }); this.col(13.9, -38.9, 14.9, -37.8);
-    this.addInter('eco3', 21.2, -34.6, { verb: 'Escuchar', y: 1.3, eco: true, on: () => game.ecoOn('eco3') });
+    this.addInter('eco3', 21.2, -34.6, { verb: 'Escuchar', y: 1.3, eco: true, on: () => this.game.ecoOn('eco3') });
 
     /* ================= EL PASAJE ================= */
     ground(4, 26, M.stoneF, 0, -61, 3);
@@ -266,7 +269,7 @@ class SceneManager {
     decal(textTex(['ÉL TE MIRA', 'SI TÚ LO MIRAS'], { w: 512, h: 200, size: 60, rough: true, seed: 5 }), 3.0, 1.2, -1.985, 1.6, -68.2, PI / 2);
     this.addInter('pared', -1.2, -68.2, { verb: 'Leer', y: 1.6, hx: -1.85, hit: [0.3, 1.4, 2.8], r: 1.6 });
     d.informe = this.P(0.3, 0.42, this.mat(null, 0xc4c0b0), 0.9, 0.02, -70.6, -0.4, -PI / 2);
-    this.addInter('informe', 0.9, -70.6, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !game.f.doc_informe });
+    this.addInter('informe', 0.9, -70.6, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !this.game.f.doc_informe });
     this.B(0.14, 0.14, 0.14, M.bulbRed, 0, 3.6, -73.6); d.lPasaje = this.light(0x8a2414, 0.9, 11, 0, 3.3, -73.2, 'slow');
     d.watcher = this.makeWatcher(1); d.watcher.visible = false; S.add(d.watcher);
 
@@ -282,12 +285,12 @@ class SceneManager {
       for (let k = 0; k < 8; k++) { this.C(0.035, 0.035, 4.3, M.metal, s * (0.1 + k * 0.235), 2.2, 0, { p: g, seg: 5 }); this.C(0.0, 0.06, 0.3, M.rust, s * (0.1 + k * 0.235), 4.5, 0, { p: g, seg: 4 }); }
       const e = this.C(0.62, 0.62, 0.07, M.rust, s * 1.8, 2.0, 0.05, { p: g, rx: PI / 2, seg: 14 }); e.geometry = new THREE.CylinderGeometry(0.62, 0.62, 0.07, 14, 1, false, s > 0 ? PI : 0, PI);
       this.B(0.55, 0.05, 0.1, M.dark, s * 1.5, 2.0, 0.09, { p: g, rz: s * -0.22 }); });
-    d.gateCol = this.col(-1.8, -84.4, 1.8, -83.8, () => !game.f.puertaAbierta);
+    d.gateCol = this.col(-1.8, -84.4, 1.8, -83.8, () => !this.game.f.puertaAbierta);
     this.B(0.3, 0.06, 0.06, M.rust, 0, 5.3, -83.9); this.B(0.2, 0.26, 0.2, M.bulbCold, 0, 5.1, -83.8); d.lPuerta = this.light(0x8fa8b0, 1.0, 14, 0, 4.9, -82.6, 'slow');
     // pedestal con cuatro placas
     this.C(0.5, 0.62, 1.0, M.stone, 0, 0.5, -81.4, { seg: 8 }); this.C(0.62, 0.62, 0.1, M.stone, 0, 1.03, -81.4, { seg: 8, rx: 0.3 }); this.circles.push({ x: 0, z: -81.4, r: 0.7 });
     [-0.3, -0.1, 0.1, 0.3].forEach(x => this.C(0.085, 0.085, 0.04, M.rust, x, 1.1, -81.36 + 0, { seg: 8, rx: 0.3 }));
-    this.addInter('pedestal', 0, -80.4, { verb: 'Usar', y: 1.1, hz: -81.3, hit: [1.2, 0.8, 1.1], on: () => !game.f.puertaAbierta });
+    this.addInter('pedestal', 0, -80.4, { verb: 'Usar', y: 1.1, hz: -81.3, hit: [1.2, 0.8, 1.1], on: () => !this.game.f.puertaAbierta });
     [[-0.9, -81.0], [0.85, -81.7], [-0.5, -82.1]].forEach(([x, z]) => { this.C(0.03, 0.035, 0.16, M.paper, x, 0.08, z); this.B(0.03, 0.05, 0.03, M.bulb, x, 0.19, z); });
     d.lVelas = this.light(0xc88a40, 0.5, 5, 0, 0.6, -81, 'candle');
     decal(textTex(['PARA ENTRAR, REZA.', 'PARA SALIR,', 'REZA AL REVÉS.'], { w: 256, h: 160, size: 26, color: '#c9b98a', bg: '#2a261f', font: 'Georgia, "Times New Roman", serif' }), 1.0, 0.62, -2.7, 1.6, -83.985, 0);
@@ -297,7 +300,7 @@ class SceneManager {
       const hd = new THREE.Mesh(new THREE.SphereGeometry(0.24, 7, 5), M.stone); hd.position.set(0, 2.62, 0.02); g.add(hd); this.C(0.0, 0.32, 0.5, M.stone, 0, 2.86, -0.06, { p: g, seg: 7, rx: -0.25 });
       this.B(0.1, 0.55, 0.12, M.stone, -0.2, 2.35, 0.2, { p: g, rz: -0.5, rx: -0.5 }); this.B(0.1, 0.55, 0.12, M.stone, 0.2, 2.35, 0.2, { p: g, rz: 0.5, rx: -0.5 }); this.B(0.42, 0.14, 0.1, M.stone, 0, 2.62, 0.24, { p: g }); this.circles.push({ x, z, r: 0.6 }); };
     statue(-4.0, -82.3, 0.5); statue(4.0, -82.3, -0.5); statue(-3.9, -76.2, 1.6); statue(3.9, -78.2, -1.6);
-    this.addInter('eco4', 2.6, -77, { verb: 'Escuchar', y: 1.3, eco: true, on: () => game.ecoOn('eco4') });
+    this.addInter('eco4', 2.6, -77, { verb: 'Escuchar', y: 1.3, eco: true, on: () => this.game.ecoOn('eco4') });
     // el hospital, al otro lado
     const ht = canvasTex(512, 512, (g, w, h) => { g.fillStyle = '#0a0a0b'; g.fillRect(0, 0, w, h); const R = rng(77); for (let y = 0; y < 9; y++) for (let x = 0; x < 12; x++) { g.fillStyle = R() < 0.82 ? `rgb(${190 + R() * 40},${170 + R() * 30},${110 + R() * 30})` : '#141416'; g.fillRect(18 + x * 41, 26 + y * 52, 24, 34); } }, true);
     d.hospital = this.P(34, 30, new THREE.MeshBasicMaterial({ map: ht, color: 0x443830, fog: true }), 0, 15, -106); d.hospital.material.color.setHex(0x000000);
@@ -362,13 +365,13 @@ class SceneManager {
       if (it.eco) { it.glint.scale.setScalar(0.7 + 0.2 * Math.sin(time * 1.3)); it.glint.position.y = it.y + Math.sin(time * 0.8) * 0.15; it.glint.material.color.setHex(0x9ab0c0); } });
   }
 }
-function paintTextRaw(g, txt, x, y, size, color) { g.font = `bold ${size}px Impact, "Arial Narrow Bold", "Helvetica Neue", Arial, sans-serif`; g.textAlign = 'center'; g.fillStyle = color; g.fillText(txt, x, y); g.globalAlpha = 0.5; g.fillText(txt, x + 1, y + 2); g.globalAlpha = 1; }
-function zoneAt(x, z) { return x > 13.15 ? 'tienda' : z > -22 ? 'callejon' : z > -48.5 ? 'plaza' : z > -74 ? 'pasaje' : 'puerta'; }
+export function paintTextRaw(g, txt, x, y, size, color) { g.font = `bold ${size}px Impact, "Arial Narrow Bold", "Helvetica Neue", Arial, sans-serif`; g.textAlign = 'center'; g.fillStyle = color; g.fillText(txt, x, y); g.globalAlpha = 0.5; g.fillText(txt, x + 1, y + 2); g.globalAlpha = 1; }
+export function zoneAt(x, z) { return x > 13.15 ? 'tienda' : z > -22 ? 'callejon' : z > -48.5 ? 'plaza' : z > -74 ? 'pasaje' : 'puerta'; }
 
 /* =====================================================================
    CameraManager — cámaras fijas por zonas; siguen al jugador con la mirada.
    ===================================================================== */
-const CAMS = [
+export const CAMS = [
   { id: 'tienda', test: (x, z) => x > 13.15, pos: [22.5, 2.95, -29.5], fov: 62 },
   { id: 'callA', test: (x, z) => z > -11, pos: [1.95, 6.4, 1.4], fov: 50 },
   { id: 'callB', test: (x, z) => z > -22, pos: [1.9, 0.45, -21.4], fov: 58, yoff: 1.5 },
@@ -382,7 +385,7 @@ const CAMS = [
   { id: 'pasajeA', test: () => false, pos: [0.15, 1.95, -49.6], fov: 60, fixed: [0, 1.5, -62] },
   { id: 'verja', test: () => false, pos: [-2.9, 1.0, -76.4], fov: 55, fixed: [0.9, 2.7, -90] },
 ];
-class CameraManager {
+export class CameraManager {
   constructor() { this.cam = new THREE.PerspectiveCamera(50, 1, 0.1, 140); this.cur = null; this.target = new THREE.Vector3(); this.force = null; this.switched = false; this.shake = 0; }
   byId(id) { return CAMS.find(c => c.id === id); }
   update(dt, player, time) {
@@ -401,7 +404,7 @@ class CameraManager {
 /* =====================================================================
    Player — figura articulada, movimiento relativo a la cámara, colisiones.
    ===================================================================== */
-class Player {
+export class Player {
   constructor(world) {
     this.world = world; this.pos = new THREE.Vector3(0, 0, -1.6); this.ry = PI; this.zone = 'callejon'; this.phase = 0; this.moving = false; this.lie = 0;
     this.fwd = new THREE.Vector3(0, 0, -1); this.right = new THREE.Vector3(1, 0, 0); this.vel = new THREE.Vector3(); this.stepCb = null;
@@ -491,7 +494,7 @@ class Player {
    Gfx — render a baja resolución + pasada de postproceso (grano, viñeta,
    aberración cromática, etalonaje). Escrito a mano: sin dependencias.
    ===================================================================== */
-class Gfx {
+export class Gfx {
   constructor(canvas) {
     this.r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false }); this.r.setPixelRatio(1); this.r.autoClear = true;
     this.u = { tD: { value: null }, time: { value: 0 }, fear: { value: 0 }, dark: { value: 1 }, red: { value: 0 }, res: { value: new THREE.Vector2(640, 480) } };

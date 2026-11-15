@@ -1,9 +1,14 @@
+import { ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS } from './data.js';
+import { AudioManager } from './audio.js';
+import { SceneManager, CameraManager, Player, Gfx } from './world.js';
+import { $, esc, clamp, SaveManager, LanguageSystem, Inventory, LoreArchive, DialogueSystem, PuzzleSystem, UIManager } from './systems.js';
+import { SCREENS, HotspotSystem } from './screens.js';
 /* =====================================================================
    GUIONES de los objetos interactivos. Cada guion es una función async:
    la historia se lee de arriba abajo, como una escena.
    ===================================================================== */
-const DRINKS = ['naranja', 'agua', 'limon', 'cafe'];
-const SCRIPTS = {
+export const DRINKS = ['naranja', 'agua', 'limon', 'cafe'];
+export const SCRIPTS = {
   async nota(g) { await g.doc('nota'); await g.think('«El hombre que no duerme.» ¿Quién es?'); },
   async grafiti(g) { await g.doc('grafiti'); if (!g.f.chaseDone) await g.think('Alguien escribió esto con pintura roja.', '¿Por qué «atrás»? Detrás de mí no hay nada.'); else if (g.f.puertaAbierta) await g.think('Las palabras son nuevas. La pintura todavía está fresca.'); else await g.think('Antes había otras palabras aquí.', 'La pared sabe qué hice en el pasaje.'); },
   async linterna(g) { if (!g.give('linterna')) return; g.set('got_linterna'); await g.think('Una linterna. No funciona.', 'Necesita pilas.'); },
@@ -111,8 +116,8 @@ Object.keys(ECOS).forEach(id => { SCRIPTS[id] = async g => { const e = ECOS[id];
 /* =====================================================================
    Game — estado, bucle principal, entrada, eventos del capítulo.
    ===================================================================== */
-let game = null;
-class Game {
+export let game = null;
+export class Game {
   constructor() {
     this.save = new SaveManager(); this.audio = new AudioManager(); const s = this.save.settings(); this.audio.vol = s.vol; this.audio.muted = !!s.muted; this.audio.voz = s.voz !== false;
     this.state = this.save.fresh(); this.f = this.state.flags; this.mode = 'title'; this.busy = false; this.chase = null; this.time = 0; this.keys = {}; this.joy = { x: 0, y: 0 }; this.runT = false;
@@ -255,13 +260,3 @@ class Game {
     window.addEventListener('pagehide', () => this.saveNow());
   }
 }
-
-/* ---------- arranque con comprobación de requisitos ---------- */
-(function () {
-  const fail = msg => { const e = $('err'); e.innerHTML = msg; e.classList.remove('hidden'); $('title').classList.add('hidden'); };
-  try {
-    if (typeof THREE === 'undefined') return fail('El sueño no puede empezar.<br>Falta el motor gráfico. Abre otra vez el archivo completo.');
-    const t = document.createElement('canvas'); if (!(window.WebGLRenderingContext && (t.getContext('webgl2') || t.getContext('webgl') || t.getContext('experimental-webgl')))) return fail('El sueño no puede empezar.<br>Este navegador no tiene WebGL. Prueba con otro navegador.');
-    new Game().boot(); window.__sueno = game;
-  } catch (e) { console.error(e); fail('El sueño no puede empezar.<br>Hay un error en este navegador.'); }
-})();

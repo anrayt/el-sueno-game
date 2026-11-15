@@ -1,13 +1,15 @@
+import { SAVE_KEYS, LEGACY_SAVE_KEY, SET_KEY, MAX_SLOTS, ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS, SYMBOLS, PLATE_ORDER, PRAYER, SOLUTION } from './data.js';
+import { SCREENS } from './screens.js';
 /* =====================================================================
    SISTEMAS: guardado, idioma, inventario, archivo, diálogo, enigma,
    interacción e interfaz.
    ===================================================================== */
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+export const $ = id => document.getElementById(id);
+export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* ---------- SaveManager: LocalStorage con validación y tolerancia a datos dañados ---------- */
-class SaveManager {
+export class SaveManager {
   constructor() { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {}; this.key = SAVE_KEYS.quest; this.migrate(); }
   /** El guardado común de antes (LEGACY_SAVE_KEY) pasa al quest y se borra: la versión de caminar empieza de cero. */
   migrate() { const old = this._get(LEGACY_SAVE_KEY); if (old === null) return; if (this._get(this.key) === null) this._set(this.key, old); try { this.ok ? localStorage.removeItem(LEGACY_SAVE_KEY) : delete this.mem[LEGACY_SAVE_KEY]; } catch (e) {} }
@@ -35,7 +37,7 @@ class SaveManager {
 }
 
 /* ---------- LanguageSystem: léxico, palabras aprendidas, marcado de textos ---------- */
-class LanguageSystem {
+export class LanguageSystem {
   constructor(game) { this.game = game; this.map = {}; this.byKey = {}; LEX.forEach(e => { this.byKey[e.k] = e; e.forms.forEach(f => { this.map[f] = e; }); }); }
   /** Envuelve las palabras del léxico en <span> para poder consultarlas. Respeta las etiquetas HTML. */
   markup(text) { const known = this.game.state.words;
@@ -46,7 +48,7 @@ class LanguageSystem {
 }
 
 /* ---------- Inventory ---------- */
-class Inventory {
+export class Inventory {
   constructor(game) { this.game = game; }
   get items() { return this.game.state.inv; }
   has(id) { return this.items.includes(id); }
@@ -58,13 +60,13 @@ class Inventory {
 }
 
 /* ---------- LoreArchive ---------- */
-class LoreArchive {
+export class LoreArchive {
   constructor(game) { this.game = game; }
   unlock(id) { const st = this.game.state; if (!ARCHIVE[id] || st.archive.includes(id)) return; st.archive.push(id); this.game.ui.toast(`Archivo: <i>${esc(ARCHIVE[id].title)}</i>`); this.game.lang.learn(ARCHIVE[id].text); this.game.saveSoon(); }
 }
 
 /* ---------- DialogueSystem: subtítulos con máquina de escribir y elecciones ---------- */
-class DialogueSystem {
+export class DialogueSystem {
   constructor(game) { this.game = game; this.resolve = null; this.typing = null; this.choice = null; this.box = $('sub'); this.txt = $('subTxt'); this.who = $('subWho'); this.chs = $('choices');
     this.box.addEventListener('click', e => { if (e.target.closest('.w')) return; this.advance(); }); }
   get active() { return !!(this.resolve || this.choice); }
@@ -89,7 +91,7 @@ class DialogueSystem {
 }
 
 /* ---------- PuzzleSystem: las cuatro placas de la puerta ---------- */
-class PuzzleSystem {
+export class PuzzleSystem {
   constructor(game) { this.game = game; this.seq = []; this.res = null; this.lock = false;
     $('pzClose').addEventListener('click', () => { if (!this.game.ui.guarded()) this.close(false); }); }
   open() { const g = this.game; return new Promise(res => { this.res = res; this.seq = []; this.lock = false; g.ui.modal = 'puzzle'; g.ui.guard(); $('puzzle').classList.remove('hidden');
@@ -108,7 +110,7 @@ class PuzzleSystem {
 }
 
 /* ---------- UIManager ---------- */
-class UIManager {
+export class UIManager {
   constructor(game) { this.game = game; this.modal = null; this.tab = 0; this.selItem = null; this.combine = false; this.selDoc = null; this.selArch = null; this.docRes = null; this.flashT = 0; this.bind(); }
   bind() { const g = this.game; document.addEventListener('pointerdown', () => { this.pdT = performance.now(); }, true);
     // un botón con foco se activaría con Espacio/Intro al avanzar el diálogo: se le quita el foco

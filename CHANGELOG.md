@@ -5,6 +5,8 @@
 ## [Не выпущено]
 
 ### Добавлено
+- ES-модули и esbuild (`0.28.2`, точная версия): явные `import`/`export`, точки входа `src/main.js` и `versions/walk/src/main.js`, three.js через `import` (tree-shaking, минификация: ~570 KB вместо ~770 KB). По-прежнему один HTML на версию, работает через `file://`. `package.json`: `"type": "module"`. `SceneManager` использует `this.game` вместо глобального `game`. Тесты читают версию three из `__sueno.three`, ключи сохранений — литералами.
+- Тег `v0.2-pre-hybrid` — состояние перед гибридом. Playwright MCP закреплён на `0.0.85`.
 - Версия с ходьбой в репозитории: актуальные исходники (новый герой, фикс повторного срабатывания пробела, мягкая цветокоррекция страха) в `versions/walk/src/`; `src/data.js` и `src/audio.js` общие с квестом. `npm run build` собирает `dist/el-sueno.html` и `dist/el-sueno-walk.html`.
 - `npm run build:site` (вместо `site`): `site/index.html`, `site/walk/index.html`, `_headers`, `404.html` (редирект на `/`).
 - Тесты версии с ходьбой `tests/e2e_walk.py` (прохождение, 67 проверок) и `tests/e2e_walk_mobile.py` (тач, 14) — `npm run test:walk`; теперь возвращают код 1 при падении.

@@ -42,7 +42,7 @@ with sync_playwright() as p:
         pg.keyboard.press('KeyE'); pg.wait_for_timeout(200); return flush()
 
     pg.goto(URL); pg.wait_for_timeout(1200)
-    ok('1 carga: THREE r149 + juego', ev('THREE.REVISION')=='149' and ev('!!window.__sueno'))
+    ok('1 carga: THREE r149 + juego', ev('__sueno.three')=='149' and ev('!!window.__sueno'))
     ok('1 título sin «Continuar» (sin guardado)', ev("document.getElementById('tCont').classList.contains('hidden')"))
     pg.click('#tNew'); pg.wait_for_timeout(11500); r=flush()
     s=st(); ok('2 intro termina, jugador en el callejón', r=='idle' and s['zone']=='callejon' and s['mode']=='play', s)

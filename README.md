@@ -30,10 +30,10 @@ npm run serve   # http://localhost:8080/el-sueno.html
 
 ```sh
 npm install      # ставит three@0.149.0
-npm run build    # → dist/el-sueno.html и dist/el-sueno-walk.html (~770 KB каждый)
+npm run build    # → dist/el-sueno.html и dist/el-sueno-walk.html (~570 KB каждый)
 ```
 
-`build.js` склеивает `src/shell.html` + `three.min.js` + `src/{data,audio,world,systems,screens,game}.js` в один файл (квест). Версия с ходьбой собирается из `versions/walk/src/{shell.html,world,systems,game}.js` и общих `src/data.js`, `src/audio.js`. Порядок скриптов важен — см. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`build.js` собирает каждую версию esbuild'ом из ES-модулей (точка входа `src/main.js` или `versions/walk/src/main.js`, three.js через `import`) в один IIFE и встраивает его в `shell.html` — получается один HTML, который открывается через `file://`. Подробнее — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Как тестировать
 
@@ -91,7 +91,7 @@ npm run deploy      # ручной деплой через wrangler (минуя 
 ├── deploy/cloudflare/ _headers и 404.html для Cloudflare Pages
 ├── scripts/site.js    подготовка каталога site/ для деплоя
 ├── .github/workflows/ CI: сборка, e2e, деплой
-├── build.js           сборка в один HTML
+├── build.js           сборка esbuild → один HTML на версию
 ├── requirements.txt   зависимости тестов
 ├── HANDOFF.md         записка предыдущего разработчика
 └── CHANGELOG.md
@@ -101,7 +101,7 @@ npm run deploy      # ручной деплой через wrangler (минуя 
 
 | Документ | О чём |
 |---|---|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | модули, порядок загрузки, поток данных, игровой цикл, сцены, диалоги, сохранение |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | модули, сборка, поток данных, игровой цикл, сцены, диалоги, сохранение |
 | [GAME_DESIGN.md](docs/GAME_DESIGN.md) | концепция, карта сцен, полное прохождение, флаги, загадка, погоня, концовка |
 | [LORE.md](docs/LORE.md) | мир, Орден, Проект Vigilia, персонажи; факт / свидетельство / гипотеза |
 | [LANGUAGE_DESIGN.md](docs/LANGUAGE_DESIGN.md) | как испанский встроен в механики, словарь, план A2 → B1 |

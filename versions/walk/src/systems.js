@@ -1,13 +1,15 @@
+import * as THREE from 'three';
+import { SAVE_KEYS, SET_KEY, MAX_SLOTS, ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS, SYMBOLS, PLATE_ORDER, PRAYER, SOLUTION } from '../../../src/data.js';
 /* =====================================================================
    SISTEMAS: guardado, idioma, inventario, archivo, diálogo, enigma,
    interacción e interfaz.
    ===================================================================== */
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+export const $ = id => document.getElementById(id);
+export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* ---------- SaveManager: LocalStorage con validación y tolerancia a datos dañados ---------- */
-class SaveManager {
+export class SaveManager {
   constructor() { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {}; this.key = SAVE_KEYS.walk; }
   _get(k) { try { return this.ok ? localStorage.getItem(k) : this.mem[k] || null; } catch (e) { return null; } }
   _set(k, v) { try { if (this.ok) localStorage.setItem(k, v); else this.mem[k] = v; return true; } catch (e) { return false; } }
@@ -33,7 +35,7 @@ class SaveManager {
 }
 
 /* ---------- LanguageSystem: léxico, palabras aprendidas, marcado de textos ---------- */
-class LanguageSystem {
+export class LanguageSystem {
   constructor(game) { this.game = game; this.map = {}; this.byKey = {}; LEX.forEach(e => { this.byKey[e.k] = e; e.forms.forEach(f => { this.map[f] = e; }); }); }
   /** Envuelve las palabras del léxico en <span> para poder consultarlas. Respeta las etiquetas HTML. */
   markup(text) { const known = this.game.state.words;
@@ -44,7 +46,7 @@ class LanguageSystem {
 }
 
 /* ---------- Inventory ---------- */
-class Inventory {
+export class Inventory {
   constructor(game) { this.game = game; }
   get items() { return this.game.state.inv; }
   has(id) { return this.items.includes(id); }
@@ -56,13 +58,13 @@ class Inventory {
 }
 
 /* ---------- LoreArchive ---------- */
-class LoreArchive {
+export class LoreArchive {
   constructor(game) { this.game = game; }
   unlock(id) { const st = this.game.state; if (!ARCHIVE[id] || st.archive.includes(id)) return; st.archive.push(id); this.game.ui.toast(`Archivo: <i>${esc(ARCHIVE[id].title)}</i>`); this.game.lang.learn(ARCHIVE[id].text); this.game.saveSoon(); }
 }
 
 /* ---------- DialogueSystem: subtítulos con máquina de escribir y elecciones ---------- */
-class DialogueSystem {
+export class DialogueSystem {
   constructor(game) { this.game = game; this.resolve = null; this.typing = null; this.choice = null; this.box = $('sub'); this.txt = $('subTxt'); this.who = $('subWho'); this.chs = $('choices');
     this.box.addEventListener('click', e => { if (e.target.closest('.w')) return; this.advance(); }); }
   get active() { return !!(this.resolve || this.choice); }
@@ -87,7 +89,7 @@ class DialogueSystem {
 }
 
 /* ---------- PuzzleSystem: las cuatro placas de la puerta ---------- */
-class PuzzleSystem {
+export class PuzzleSystem {
   constructor(game) { this.game = game; this.seq = []; this.res = null; this.lock = false;
     $('pzClose').addEventListener('click', () => { if (!this.game.ui.guarded()) this.close(false); }); }
   open() { const g = this.game; return new Promise(res => { this.res = res; this.seq = []; this.lock = false; g.ui.modal = 'puzzle'; g.ui.guard(); $('puzzle').classList.remove('hidden');
@@ -106,7 +108,7 @@ class PuzzleSystem {
 }
 
 /* ---------- InteractionSystem: objeto más cercano, puntero y ratón ---------- */
-class InteractionSystem {
+export class InteractionSystem {
   constructor(game) { this.game = game; this.near = null; this.ray = new THREE.Raycaster(); this.v = new THREE.Vector2(); this.hover = null; }
   boxes() { return this.game.world.inter.map(i => i.hitbox); }
   update() { const g = this.game, p = g.player.pos; let best = null, bd = 1e9;
@@ -125,7 +127,7 @@ class InteractionSystem {
 }
 
 /* ---------- UIManager ---------- */
-class UIManager {
+export class UIManager {
   constructor(game) { this.game = game; this.modal = null; this.tab = 0; this.selItem = null; this.combine = false; this.selDoc = null; this.selArch = null; this.docRes = null; this.flashT = 0; this.bind(); }
   bind() { const g = this.game; document.addEventListener('pointerdown', () => { this.pdT = performance.now(); }, true);
     document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }, true);

@@ -4,7 +4,7 @@
    radio, eventos aleatorios (metal, voces, campanas FM, glitch),
    bus de amenaza (sub + clúster disonante + latido) y efectos.
    ===================================================================== */
-class AudioManager {
+export class AudioManager {
   constructor() {
     this.ctx = null; this.vol = 0.8; this.muted = false; this.voz = true;
     this.ready = false; this.nextEvent = 4; this.nextRing = 0; this.nextBeat = 0; this.nextRiff = 6;

@@ -57,7 +57,7 @@ with sync_playwright() as p:
         except Exception: raise AssertionError((label, ev("document.getElementById('nav').textContent")))
         tap(f'#nav .nv:has-text("{label}")'); pg.wait_for_timeout(1600); flush(); pg.wait_for_timeout(300); return flush()
     pg.goto(URL); pg.wait_for_timeout(1200)
-    ok('carga sin errores, THREE r149', ev('THREE.REVISION')=='149' and ev('!!window.__sueno'))
+    ok('carga sin errores, THREE r149', ev('__sueno.three')=='149' and ev('!!window.__sueno'))
     tap('#tNew'); pg.wait_for_timeout(11500); r=flush()
     try: pg.wait_for_function("document.querySelectorAll('.hs.on').length==3 && document.querySelectorAll('#nav .nv').length==1",timeout=5000)
     except Exception: pass

@@ -1,9 +1,11 @@
+import * as THREE from 'three';
+import { $, esc, clamp } from './systems.js';
 /* =====================================================================
    ESCENAS: la partida es una serie de planos fijos. En cada plano hay
    puntos activos (objetos) y salidas (otros planos). No se camina:
    se mira, se lee y se elige.
    ===================================================================== */
-const SCREENS = {
+export const SCREENS = {
   callejon1: { cam: 'callA', at: [0.2, -3.2], ry: Math.PI, hs: ['nota', 'linterna', 'puertaCallejon'],
     exits: [{ label: 'Seguir por el callejón', to: 'callejon2' }] },
   callejon2: { cam: 'callB', at: [0.2, -15.6], ry: -1.2, hs: ['grafiti', 'eco1'],
@@ -25,7 +27,7 @@ const SCREENS = {
 };
 
 /* ---------- HotspotSystem: puntos activos sobre la imagen + barra de salidas ---------- */
-class HotspotSystem {
+export class HotspotSystem {
   constructor(game) { this.game = game; this.layer = $('hs'); this.nav = $('nav'); this.items = []; this.hover = null; this.v = new THREE.Vector3(); this.sig = ''; }
   /** Crea los puntos del plano actual. */
   build() { const g = this.game, s = SCREENS[g.scr]; this.layer.innerHTML = ''; this.hover = null;

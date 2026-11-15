@@ -1,4 +1,3 @@
-'use strict';
 /* =====================================================================
    EL SUEÑO — Capítulo I: La Ciudad Vacía
    DATOS DEL JUEGO: todo el contenido (objetos, documentos, léxico,
@@ -6,12 +5,12 @@
    ===================================================================== */
 // Cada versión guarda en su clave: en el mismo dominio (/ y /walk/) comparten localStorage.
 // LEGACY_SAVE_KEY: el guardado común de antes de separar las versiones; lo hereda el quest.
-const SAVE_KEYS = { quest: 'el_sueno_cap1_quest_v1', walk: 'el_sueno_cap1_walk_v1' };
-const LEGACY_SAVE_KEY = 'el_sueno_cap1_v1';
-const SET_KEY = 'el_sueno_ajustes_v1';
-const MAX_SLOTS = 6;
+export const SAVE_KEYS = { quest: 'el_sueno_cap1_quest_v1', walk: 'el_sueno_cap1_walk_v1' };
+export const LEGACY_SAVE_KEY = 'el_sueno_cap1_v1';
+export const SET_KEY = 'el_sueno_ajustes_v1';
+export const MAX_SLOTS = 6;
 
-const ZONES = {
+export const ZONES = {
   callejon: { name: 'El Callejón', n: 'I' },
   plaza:    { name: 'La Plaza', n: 'II' },
   tienda:   { name: 'La Tienda', n: 'III' },
@@ -20,7 +19,7 @@ const ZONES = {
 };
 
 /* ---------- Objetos del inventario ---------- */
-const ITEMS = {
+export const ITEMS = {
   linterna:    { name: 'Linterna', icon: 'M3 8h7l4-3h4v10h-4l-4-3H3zM10 8v4', desc: 'Una linterna vieja. No funciona: no tiene pilas.' },
   pilas:       { name: 'Pilas', icon: 'M4 6h5v10H4zM11 6h5v10h-5zM6 4h1v2H6zM13 4h1v2h-1z', desc: 'Dos pilas pequeñas. Son nuevas. Están en una caja con polvo.' },
   linterna_ok: { name: 'Linterna con pilas', icon: 'M2 8h6l4-3h3v10h-3l-4-3H2zM17 7l2-1M17 10h2.5M17 13l2 1', desc: 'La linterna funciona. Da una luz amarilla y débil, pero es luz.' },
@@ -34,7 +33,7 @@ const ITEMS = {
 };
 
 /* ---------- Documentos (van al Cuaderno) ---------- */
-const DOCS = {
+export const DOCS = {
   nota: { title: 'Nota mojada', cls: '', where: 'El Callejón',
     text: () => 'Si lees esto, estás dormido.\n\nNo tengas miedo. La ciudad está vacía, pero no estás solo.\n\nBusca la luz.\nBusca al hombre que no duerme.\n\n— M.' },
   grafiti: { title: 'Pintada en la pared', cls: 'wall', where: 'El Callejón',
@@ -61,7 +60,7 @@ const DOCS = {
 
 /* ---------- Léxico: definiciones en español sencillo ---------- */
 // f: formas que aparecen en los textos; d: definición; e: ejemplo
-const LEX = [
+export const LEX = [
   ['mirar', 'mirar miras mira mires miro miraste mirando miran', 'Usar los ojos para ver algo.', 'No mires atrás.'],
   ['atrás', 'atrás', 'El lugar que está detrás de ti.', 'No mires atrás.'],
   ['ciudad', 'ciudad', 'Lugar grande con muchas calles, casas y personas.', 'La ciudad está vacía.'],
@@ -141,7 +140,7 @@ const LEX = [
 ].map(a => ({ k: a[0], forms: a[1].split(' '), d: a[2], e: a[3] }));
 
 /* ---------- Archivo: lore profundo. tipo: h = hecho, t = testimonio, i = hipótesis ---------- */
-const ARCHIVE = {
+export const ARCHIVE = {
   ciudad:   { cat: 'La ciudad', title: 'La ciudad vacía', tipo: 'h', text: 'La ciudad no tiene nombre. En el periódico siempre es 7 de noviembre. En el calendario también.\n\nLas tiendas están cerradas «cinco minutos». Los vecinos no están muertos: duermen. Pero en las casas no hay camas. ¿Dónde duermen?' },
   cama:     { cat: 'La ciudad', title: 'La puerta del callejón', tipo: 'h', text: 'La puerta oxidada del callejón ahora está abierta. Dentro no hay una casa. Hay una habitación blanca y una cama de hospital. La cama está vacía y todavía está caliente.\n\nCreo que es mi cama.' },
   orden:    { cat: 'La Orden', title: 'La Orden del Ojo Cerrado', tipo: 't', text: 'Un ojo cerrado: está en la moneda, en la puerta y en la oración.\n\nLa Orden dice: «Quien duerme no sufre». Para ellos, dormir es sagrado y despertar es un pecado. Su oración no es para Dios. Es para entrar en el sueño.' },
@@ -157,7 +156,7 @@ const ARCHIVE = {
 };
 
 /* ---------- Ecos: repetición de palabras ya vistas, en situaciones nuevas ---------- */
-const ECOS = {
+export const ECOS = {
   eco1: { zone: 'callejon', need: f => f.doc_periodico, pre: 'Una voz en la niebla, muy lejos:', frase: '«La ciudad está ___.»', ops: ['vacía', 'cerrada', 'fría'], ok: 0, full: 'La ciudad está vacía.' },
   eco2: { zone: 'plaza', need: f => f.chaseDone, pre: 'Algo habla debajo del agua de la fuente:', frase: '«No mires ___.»', ops: ['arriba', 'atrás', 'aquí'], ok: 1, full: 'No mires atrás.' },
   eco3: { zone: 'tienda', need: f => f.tieneLlave, pre: 'La radio dice, con la voz de Anselmo:', frase: '«Todos duermen. Yo no ___.»', ops: ['bebo', 'miro', 'duermo'], ok: 2, full: 'Todos duermen. Yo no duermo.' },
@@ -165,12 +164,12 @@ const ECOS = {
 };
 
 /* ---------- Símbolos del enigma ---------- */
-const SYMBOLS = {
+export const SYMBOLS = {
   mano: 'M12 44V20M12 26V12M20 24V8M28 24V10M36 26V14M36 30l8-6M12 44h20l12-20',
   luna: 'M34 8a20 20 0 100 40A16 16 0 0134 8z',
   ojo:  'M4 28Q28 6 52 28Q28 50 4 28ZM28 20a8 8 0 100 16 8 8 0 000-16z',
   boca: 'M6 28Q28 14 50 28Q28 46 6 28ZM6 28h44',
 };
-const PLATE_ORDER = ['luna', 'boca', 'mano', 'ojo'];       // disposición en el pedestal
-const PRAYER = ['mano', 'luna', 'ojo', 'boca'];            // oración «para entrar»
-const SOLUTION = ['boca', 'ojo', 'luna', 'mano'];          // «para salir»: al revés
+export const PLATE_ORDER = ['luna', 'boca', 'mano', 'ojo'];       // disposición en el pedestal
+export const PRAYER = ['mano', 'luna', 'ojo', 'boca'];            // oración «para entrar»
+export const SOLUTION = ['boca', 'ojo', 'luna', 'mano'];          // «para salir»: al revés

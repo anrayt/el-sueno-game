@@ -1,4 +1,4 @@
-const fs = require('fs');
+import fs from 'node:fs';
 // Готовит каталог site/ для Cloudflare Pages из уже собранного dist/:
 //   index.html — квест, walk/index.html — версия с ходьбой, _headers — заголовки, 404.html — назад на /.
 // dist/ не трогаем: файлы там остаются для запуска через file://.

@@ -13,6 +13,8 @@ QUEST=BASE.rstrip('/')+'/' if BASE else (DIST/'el-sueno.html').as_uri()
 WALK=BASE.rstrip('/')+'/walk/' if BASE else (DIST/'el-sueno-walk.html').as_uri()
 CHROME=os.environ.get('CHROME_PATH')
 ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox','--autoplay-policy=no-user-gesture-required']
+# ключи сохранений — как в src/data.js (SAVE_KEYS, LEGACY_SAVE_KEY); в странице глобальных констант нет
+KQ, KW, KL = 'el_sueno_cap1_quest_v1', 'el_sueno_cap1_walk_v1', 'el_sueno_cap1_v1'
 errs=[]; res=[]
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS ' if cond else 'FAIL ')+name+(' — '+str(extra)[:400] if not cond else ''))
@@ -24,7 +26,7 @@ with sync_playwright() as p:
     pg=b.new_context(viewport={'width':640,'height':360}).new_page(); ev=pg.evaluate
     pg.on('console',lambda m: errs.append(m.text) if m.type=='error' else None); pg.on('pageerror',lambda e: errs.append('PE '+str(e)))
     def open_(url): pg.goto(url); pg.wait_for_timeout(1200)
-    def keys(): return ev("()=>({quest:localStorage.getItem(SAVE_KEYS.quest),walk:localStorage.getItem(SAVE_KEYS.walk),legacy:localStorage.getItem(LEGACY_SAVE_KEY)})")
+    def keys(): return ev("([q,w,l])=>({quest:localStorage.getItem(q),walk:localStorage.getItem(w),legacy:localStorage.getItem(l)})",[KQ,KW,KL])
     # la partida en sí, sin «time»: cada versión guarda también al salir de la página
     def core(raw): d=json.loads(raw); return [d.get('scr'),d['pos'],d['flags'],d['inv'],d['docs']]
     def has_cont(): return ev("!document.getElementById('tCont').classList.contains('hidden')")
@@ -38,7 +40,7 @@ with sync_playwright() as p:
         return False
 
     # 1. el guardado común antiguo pasa al quest
-    open_(QUEST); ev("()=>localStorage.clear()"); ev(f"()=>localStorage.setItem(LEGACY_SAVE_KEY,{json.dumps(json.dumps(LEGACY))})")
+    open_(QUEST); ev("()=>localStorage.clear()"); ev("([k,v])=>localStorage.setItem(k,v)",[KL,json.dumps(LEGACY)])
     open_(QUEST); k=keys()
     ok('quest: el guardado antiguo pasa a su clave y se borra', k['legacy'] is None and k['quest'] and json.loads(k['quest'])['inv']==LEGACY['inv'], k)
     ok('quest: hay «Continuar»', has_cont())
@@ -61,13 +63,13 @@ with sync_playwright() as p:
     ev("__sueno.saveNow()"); k=keys(); ok('quest: guardar no toca la partida de caminar', core(k['walk'])==core(walk_saved) and k['quest'])
 
     # 4. un guardado dañado en una versión no afecta a la otra
-    ev("()=>localStorage.setItem(SAVE_KEYS.quest,'{roto')"); open_(WALK); ok('walk: el quest dañado no le afecta', has_cont())
+    ev("([k])=>localStorage.setItem(k,'{roto')",[KQ]); open_(WALK); ok('walk: el quest dañado no le afecta', has_cont())
     cont(); ok('walk: continúa su partida', ev("__sueno.state.inv")==['pilas'] and abs(ev("__sueno.player.pos.z")+6.6)<0.1)
-    ev("([q])=>{localStorage.setItem(SAVE_KEYS.quest,q);localStorage.setItem(SAVE_KEYS.walk,'{roto')}",[quest_saved])
+    ev("([kq,kw,q])=>{localStorage.setItem(kq,q);localStorage.setItem(kw,'{roto')}",[KQ,KW,quest_saved])
     open_(QUEST); ok('quest: la partida de caminar dañada no le afecta', has_cont()); cont(); ok('quest: continúa su partida', ev("__sueno.state.inv")==LEGACY['inv'])
 
     # 5. si ya hay partida del quest, el guardado antiguo no la pisa
-    ev(f"()=>localStorage.setItem(LEGACY_SAVE_KEY,{json.dumps(json.dumps(dict(LEGACY,inv=['agua'])))})"); 
+    ev("([k,v])=>localStorage.setItem(k,v)",[KL,json.dumps(dict(LEGACY,inv=['agua']))]); 
     open_(QUEST); k=keys(); ok('quest: el guardado antiguo no pisa uno nuevo y se borra', json.loads(k['quest'])['inv']==LEGACY['inv'] and k['legacy'] is None, k)
     b.close()
 print('ERRORES DE CONSOLA:', errs or 'ninguno')

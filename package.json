@@ -2,6 +2,7 @@
   "name": "el-sueno",
   "version": "0.2.0",
   "private": true,
+  "type": "module",
   "description": "EL SUEÑO — Capítulo I: La Ciudad Vacía. Браузерный психологический хоррор-квест для изучения испанского.",
   "scripts": {
     "build": "node build.js",
@@ -17,5 +18,8 @@
   },
   "dependencies": {
     "three": "0.149.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }

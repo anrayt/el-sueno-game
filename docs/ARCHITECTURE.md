@@ -2,46 +2,43 @@
 
 ## Обзор
 
-Игра — один самодостаточный HTML-файл. `build.js` склеивает разметку, three.js и шесть скриптов игры; модулей и бандлера нет, все объявления лежат в общей глобальной области одного `<script>`.
+Игра — один самодостаточный HTML-файл на версию. Код — ES-модули с явными `import`/`export`. `build.js` запускает esbuild (точная версия в `devDependencies`): bundle от `main.js` вместе с three.js (`import * as THREE from 'three'`, r149), формат IIFE, минификация, `target: es2020`. Результат встраивается в обычный `<script>` внутри `shell.html` (плейсхолдер `/*__GAME__*/`), поэтому файл работает через `file://`, без сервера и без `type="module"`.
 
 ```mermaid
 flowchart LR
     subgraph src
         shell[shell.html<br/>разметка + CSS]
-        data[data.js]
-        audio[audio.js]
-        world[world.js]
-        systems[systems.js]
-        screens[screens.js]
-        game[game.js]
+        main[main.js<br/>точка входа]
+        data[data.js] & audio[audio.js] & world[world.js] & systems[systems.js] & screens[screens.js] & game[game.js]
     end
-    three[node_modules/three/<br/>build/three.min.js<br/>r149]
-    build{{build.js}}
-    out[dist/el-sueno.html<br/>~770 KB]
-    shell -->|/*__THREE__*/| build
-    three --> build
-    data & audio & world & systems & screens & game -->|"конкатенация,<br/>/*__GAME__*/"| build
-    build --> out
+    three[node_modules/three<br/>r149]
+    esb{{build.js<br/>esbuild: bundle, IIFE, minify}}
+    out[dist/el-sueno.html<br/>~570 KB]
+    main --> esb
+    data & audio & world & systems & screens & game & three -.->|import| esb
+    shell -->|/*__GAME__*/| esb
+    esb --> out
 ```
 
-Так же собирается версия с ходьбой: `versions/walk/src/shell.html` + three.js + `src/data.js`, `src/audio.js` (общие с квестом) + `versions/walk/src/{world,systems,game}.js` → `dist/el-sueno-walk.html`. В ней нет `screens.js`: вместо кадров и активных точек — `InteractionSystem` (ближайший объект, луч от указателя), движение `Player.move` и погоня в реальном времени.
+Так же собирается версия с ходьбой: точка входа `versions/walk/src/main.js`, разметка `versions/walk/src/shell.html`; `data.js` и `audio.js` импортируются из `src/` (общие с квестом) → `dist/el-sueno-walk.html`. В ней нет `screens.js`: вместо кадров и активных точек — `InteractionSystem` (ближайший объект, луч от указателя), движение `Player.move` и погоня в реальном времени.
 
-`build.js` экранирует `</script` внутри кода, чтобы встроенный скрипт не закрылся раньше времени, и использует функцию-заменитель в `String.replace`, чтобы `$` в коде three.js не интерпретировался как шаблон подстановки.
+`build.js` экранирует `</script` внутри бандла, чтобы встроенный скрипт не закрылся раньше времени, и использует функцию-заменитель в `String.replace`, чтобы `$` в коде не интерпретировался как шаблон подстановки. `package.json` объявляет `"type": "module"`: так `node --check` (хук после правки) понимает `import`, а `build.js` и `scripts/site.js` сами написаны как ESM.
 
-## Модули и порядок загрузки
+Глобальных объявлений нет. Для тестов `main.js` выставляет `window.__sueno` (экземпляр `Game`) и `__sueno.three` (`THREE.REVISION`).
 
-Порядок фиксирован в `build.js`: `data → audio → world → systems → screens → game`. Все файлы попадают в **один** `<script>`, поэтому на верхнем уровне можно ссылаться только на то, что объявлено выше. Внутри функций и методов порядок не важен — они вызываются после загрузки всего кода.
+## Модули
 
-| Файл | Зависит от | Что даёт |
+| Модуль | Импортирует | Экспортирует |
 |---|---|---|
 | `data.js` | — | `SAVE_KEYS`, `LEGACY_SAVE_KEY`, `SET_KEY`, `MAX_SLOTS`, `ZONES`, `ITEMS`, `DOCS`, `LEX`, `ARCHIVE`, `ECOS`, `SYMBOLS`, `PLATE_ORDER`, `PRAYER`, `SOLUTION` |
-| `audio.js` | Web Audio, `speechSynthesis` | `AudioManager` |
-| `world.js` | `THREE`, `SYMBOLS`, `DOCS`, глобальный `game` | текстуры (`TEX`, `canvasTex`, `textTex`), `SceneManager`, `CAMS`, `CameraManager`, `Player`, `Gfx`, `zoneAt` |
-| `systems.js` | данные, `game` | хелперы `$`, `esc`, `clamp`; `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` |
-| `screens.js` | `THREE`, `$`, `esc`, `clamp` | `SCREENS`, `HotspotSystem` |
-| `game.js` | всё выше | `SCRIPTS`, класс `Game`, глобальный `game`, точка входа (IIFE) |
+| `audio.js` | — (Web Audio, `speechSynthesis`) | `AudioManager` |
+| `world.js` | `three`, `DOCS`, `SYMBOLS`, `clamp` | текстуры (`TEX`, `canvasTex`, `textTex`), `SceneManager`, `CAMS`, `CameraManager`, `Player`, `Gfx`, `zoneAt` |
+| `systems.js` | данные, `SCREENS` (квест) | хелперы `$`, `esc`, `clamp`; `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` (+ `InteractionSystem` в версии с ходьбой) |
+| `screens.js` | `three`, `$`, `esc`, `clamp` | `SCREENS`, `HotspotSystem` |
+| `game.js` | всё выше | `SCRIPTS`, `DRINKS`, класс `Game`, `game` (текущий экземпляр, live binding) |
+| `main.js` | `three`, `$`, `Game`, `game` | — (проверка WebGL, `new Game().boot()`, `window.__sueno`) |
 
-Единственные действия на верхнем уровне при загрузке: регистрация сценариев фресок и Eco в `SCRIPTS` (`game.js`, нужен `ECOS` из `data.js`) и IIFE запуска в конце `game.js`. Поэтому `game.js` обязан быть последним.
+`SceneManager` обращается к игре через `this.game` (передаётся в конструктор), а не через глобальную переменную. Циклические импорты (`systems.js` ↔ `screens.js`, `world.js` → `systems.js`) безопасны: на верхнем уровне модули только объявляют, всё вызывается после загрузки. Действия на верхнем уровне — только регистрация сценариев фресок и Eco в `SCRIPTS` (`game.js`, использует `ECOS`).
 
 ```mermaid
 classDiagram
@@ -73,7 +70,7 @@ classDiagram
 
 ## Запуск
 
-1. IIFE в конце `game.js` проверяет `THREE` и WebGL; при ошибке показывает экран `#err` с текстом на испанском.
+1. `main.js` проверяет WebGL; при ошибке показывает экран `#err` с текстом на испанском.
 2. `new Game().boot()`: создаёт подсистемы, строит мир (`SceneManager.build`), игрока, камеры, точки; применяет флаги пустого состояния; вешает ввод; запускает `requestAnimationFrame`. Экземпляр доступен как `window.__sueno` (используется тестами).
 3. Экран заголовка: «Continuar» (если есть сохранение), «Nueva partida» (с подтверждением, если сохранение есть), звук.
 4. `Game.start(isNew)`: `audio.init()` (нужен жест пользователя), загрузка состояния, `setScreen(state.scr)`, `sync()`, интро для новой игры.
