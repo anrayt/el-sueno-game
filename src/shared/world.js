@@ -72,7 +72,7 @@ export class SceneManager {
     this.B(0.3, 0.06, 0.06, M.rust, -2.32, 4.0, -14.5); this.B(0.22, 0.28, 0.22, M.bulb, -2.12, 3.86, -14.5); d.lAlley = this.light(0xd9a050, 1.25, 15, -1.9, 3.8, -14.5, 'buzz');
     d.grafCanvas = document.createElement('canvas'); d.grafCanvas.width = 512; d.grafCanvas.height = 256; d.grafTex = new THREE.CanvasTexture(d.grafCanvas);
     decal(d.grafTex, 3.4, 1.7, -2.485, 1.75, -14.5, PI / 2);
-    this.addInter('grafiti', -1.7, -14.5, { verb: 'Leer', hx: -2.35, hit: [0.3, 1.6, 3.2], y: 1.7 });
+    this.addInter('grafiti', -1.7, -14.5, { auto: true, verb: 'Leer', hx: -2.35, hit: [0.3, 1.6, 3.2], y: 1.7 });
     // nota y linterna
     d.nota = this.P(0.3, 0.22, this.mat(null, 0xb0a888), -0.9, 0.02, -4.2, 0.5, -PI / 2);
     this.addInter('nota', -0.9, -4.2, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !this.game.f.doc_nota });
@@ -192,7 +192,7 @@ export class SceneManager {
       this.addInter('mural_' + sym, left ? -1.2 : 1.2, z, { verb: 'Mirar', y: 1.6, hx: left ? -1.85 : 1.85, hit: [0.3, 1.8, 1.4], r: 1.5 }); };
     mural('mano', 'LA MANO', -52.6, true); mural('luna', 'LA LUNA', -56.4, false); mural('ojo', 'EL OJO', -60.2, true); mural('boca', 'LA BOCA', -64, false);
     decal(textTex(['ÉL TE MIRA', 'SI TÚ LO MIRAS'], { w: 512, h: 200, size: 60, rough: true, seed: 5 }), 3.0, 1.2, -1.985, 1.6, -68.2, PI / 2);
-    this.addInter('pared', -1.2, -68.2, { verb: 'Leer', y: 1.6, hx: -1.85, hit: [0.3, 1.4, 2.8], r: 1.6 });
+    this.addInter('pared', -1.2, -68.2, { auto: true, verb: 'Leer', y: 1.6, hx: -1.85, hit: [0.3, 1.4, 2.8], r: 1.6 });
     d.informe = this.P(0.3, 0.42, this.mat(null, 0xc4c0b0), 0.9, 0.02, -70.6, -0.4, -PI / 2);
     this.addInter('informe', 0.9, -70.6, { verb: 'Coger', y: 0.3, hit: [0.7, 0.6, 0.7], on: () => !this.game.f.doc_informe });
     this.B(0.14, 0.14, 0.14, M.bulbRed, 0, 3.6, -73.6); d.lPasaje = this.light(0x8a2414, 0.9, 11, 0, 3.3, -73.2, 'slow');
@@ -219,7 +219,7 @@ export class SceneManager {
     [[-0.9, -81.0], [0.85, -81.7], [-0.5, -82.1]].forEach(([x, z]) => { this.C(0.03, 0.035, 0.16, M.paper, x, 0.08, z); this.B(0.03, 0.05, 0.03, M.bulb, x, 0.19, z); });
     d.lVelas = this.light(0xc88a40, 0.5, 5, 0, 0.6, -81, 'candle');
     decal(textTex(['PARA ENTRAR, REZA.', 'PARA SALIR,', 'REZA AL REVÉS.'], { w: 256, h: 160, size: 26, color: '#c9b98a', bg: '#2a261f', font: 'Georgia, "Times New Roman", serif' }), 1.0, 0.62, -2.7, 1.6, -83.985, 0);
-    this.addInter('placa', -2.5, -82.9, { hx: -2.7,  verb: 'Leer', y: 1.6, hz: -83.8, hit: [1.1, 0.8, 0.4] });
+    this.addInter('placa', -2.5, -82.9, { auto: true, hx: -2.7, verb: 'Leer', y: 1.6, hz: -83.8, hit: [1.1, 0.8, 0.4] });
     // estatuas encapuchadas que se tapan los ojos
     const statue = (x, z, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; S.add(g); this.B(0.9, 0.5, 0.9, M.stone, 0, 0.25, 0, { p: g }); this.C(0.22, 0.48, 2.0, M.stone, 0, 1.5, 0, { p: g, seg: 7 });
       const hd = new THREE.Mesh(new THREE.SphereGeometry(0.24, 7, 5), M.stone); hd.position.set(0, 2.62, 0.02); g.add(hd); this.C(0.0, 0.32, 0.5, M.stone, 0, 2.86, -0.06, { p: g, seg: 7, rx: -0.25 });
@@ -292,6 +292,7 @@ export const CAMS = [
   { id: 'puerta', test: () => true, pos: [4.3, 6.6, -74.9], fov: 50 },
   { id: 'quiosco', test: () => false, pos: [-2.4, 1.75, -26.2], fov: 50, fixed: [-6.3, 1.15, -28.6] },
   { id: 'pasajeA', test: () => false, pos: [0.15, 1.95, -49.6], fov: 60, fixed: [0, 1.5, -62] },
+  { id: 'pedestal', test: () => false, pos: [2.3, 2.5, -77.2], fov: 48, fixed: [0, 1.15, -82.4] },
   { id: 'verja', test: () => false, pos: [-2.9, 1.0, -76.4], fov: 55, fixed: [0.9, 2.7, -90] },
 ];
 export class CameraManager {

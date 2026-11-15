@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
   pull_request:
   workflow_dispatch:
 
@@ -39,10 +39,12 @@ jobs:
       - run: npm run build:site
       - run: npx --yes wrangler@4 pages deploy site --project-name "$CF_PAGES_PROJECT" --branch main --commit-hash "$GITHUB_SHA"
 
-  # Preview для pull request: ветка Pages = имя ветки PR. Секретов у PR из форков нет — там пропускается.
+  # Preview: pull request (ветка Pages = ветка PR) и push в feature/**. Секретов у PR из форков нет — там пропускается.
   preview:
     name: Cloudflare Pages (preview)
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' && github.ref != 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -51,7 +53,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      BRANCH: ${{ github.head_ref }}
+      BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,23 +64,29 @@ jobs:
       - run: npm run build:site
       - name: wrangler pages deploy
         run: |
-          npx --yes wrangler@4 pages deploy site --project-name "$CF_PAGES_PROJECT" --branch "$BRANCH" --commit-hash "${{ github.event.pull_request.head.sha }}" | tee deploy.log
+          npx --yes wrangler@4 pages deploy site --project-name "$CF_PAGES_PROJECT" --branch "$BRANCH" --commit-hash "${{ github.event.pull_request.head.sha || github.sha }}" | tee deploy.log
           url=$(grep -oE 'https://[^ ]+\.pages\.dev' deploy.log | tail -1)
           echo "PREVIEW_URL=$url" >> "$GITHUB_ENV"
-          { echo "### Preview"; echo; echo "- Квест: $url/"; echo "- Ходьба: $url/walk/"; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### Preview"; echo; echo "- $url/"; } >> "$GITHUB_STEP_SUMMARY"
       - name: Ссылка в PR
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          body="Preview ${GITHUB_SHA::7}: $PREVIEW_URL/ (квест) · $PREVIEW_URL/walk/ (ходьба)"
+          body="Preview ${GITHUB_SHA::7}: $PREVIEW_URL/"
           gh pr comment "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --edit-last --body "$body" \
             || gh pr comment "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --body "$body"
 
+  # Два набора параллельно (каждый проходит главу в реальном времени): основной режим и «Modo lectura» + сохранения.
   e2e:
-    name: e2e
+    name: e2e (${{ matrix.suite }})
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [hibrido, lectura]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -95,23 +103,25 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m playwright install --with-deps chromium
       # Каждый шаг проходит до конца даже после падения предыдущего; код возврата ≠ 0 при любой упавшей проверке.
-      - name: квест — десктоп
+      # Упавшие проверки видны как аннотации прогона (::error).
+      - name: гибрид — десктоп
+        if: matrix.suite == 'hibrido'
         run: python tests/e2e.py
-      - name: квест — мобильный
-        if: ${{ !cancelled() }}
+      - name: гибрид — мобильный
+        if: ${{ !cancelled() && matrix.suite == 'hibrido' }}
         run: python tests/e2e.py m
-      - name: ходьба — десктоп
-        if: ${{ !cancelled() }}
-        run: python tests/e2e_walk.py
-      - name: ходьба — мобильный
-        if: ${{ !cancelled() }}
-        run: python tests/e2e_walk_mobile.py
-      - name: сохранения квеста и ходьбы
-        if: ${{ !cancelled() }}
+      - name: Modo lectura — десктоп
+        if: matrix.suite == 'lectura'
+        run: python tests/e2e_lectura.py
+      - name: Modo lectura — мобильный
+        if: ${{ !cancelled() && matrix.suite == 'lectura' }}
+        run: python tests/e2e_lectura.py m
+      - name: сохранения и миграция
+        if: ${{ !cancelled() && matrix.suite == 'lectura' }}
         run: python tests/e2e_saves.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots
+          name: screenshots-${{ matrix.suite }}
           path: tests/screenshots/
           retention-days: 14

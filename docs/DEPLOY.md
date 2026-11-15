@@ -9,19 +9,19 @@ flowchart LR
     P[push в main] --> D["npm run build:site"]
     D --> W[wrangler pages deploy --branch main]
     W --> CF[(Cloudflare Pages<br/>production)]
-    P --> E[e2e: квест desktop + mobile, ходьба]
-    PR[pull request] --> E
-    PR --> PV["build:site → wrangler --branch &lt;ветка PR&gt;"]
-    PV --> PCF[(preview<br/>ссылка в PR)]
+    P --> E[e2e: основной режим, Modo lectura, сохранения]
+    PR[pull request / push в feature/**] --> E
+    PR --> PV["build:site → wrangler --branch &lt;ветка&gt;"]
+    PV --> PCF[(preview)]
 ```
 
 - `.github/workflows/ci.yml`, три job:
   - `deploy` — на push в `main` (и ручной запуск на `main`): `npm ci` → `npm run build:site` → `npx wrangler@4 pages deploy site --project-name el-sueno --branch main`. **От e2e не зависит**: тесты идут параллельно, их падение видно в Actions, но продакшен обновляется. Если нужен деплой только после зелёных тестов — вернуть `needs: e2e`.
-  - `preview` — на pull request из этого же репозитория (у PR из форков нет секретов): тот же деплой с `--branch <ветка PR>`. Ссылка — в summary прогона и в комментарии к PR (обновляется при новых коммитах).
-  - `e2e` — на push и pull request, одна job с таймаутом 40 минут: `tests/e2e.py` (десктоп), `tests/e2e.py m` (мобильный), `tests/e2e_walk.py` и `tests/e2e_walk_mobile.py` (ходьба), `tests/e2e_saves.py` (сохранения двух версий). Шаги идут до конца, даже если предыдущий упал. Скриншоты — артефакт `screenshots` (14 дней).
-- `npm run build:site` собирает обе версии и готовит каталог `site/`: `index.html` — квест, `walk/index.html` — версия с ходьбой, `_headers` и `404.html` из `deploy/cloudflare/`. Каталог `dist/` не меняется — файлы там по-прежнему открываются через `file://`.
+  - `preview` — на pull request из этого же репозитория (у PR из форков нет секретов) и на push в ветки `feature/**`: тот же деплой с `--branch <ветка>`. Адрес — `https://<ветка-через-дефис>.el-sueno.pages.dev` и в summary прогона; для PR ссылка ещё и в комментарии (обновляется при новых коммитах).
+  - `e2e` — на push (`main`, `feature/**`) и pull request, два набора параллельно, таймаут каждого 40 минут: `hibrido` — `tests/e2e.py` (десктоп и мобильный); `lectura` — `tests/e2e_lectura.py` (десктоп и мобильный) и `tests/e2e_saves.py`. Шаги идут до конца, даже если предыдущий упал. Упавшие проверки видны как аннотации прогона; скриншоты — артефакты `screenshots-*` (14 дней).
+- `npm run build:site` собирает игру и готовит каталог `site/`: `index.html`, `_headers`, `_redirects` и `404.html` из `deploy/cloudflare/`. Каталог `dist/` не меняется — файл там по-прежнему открывается через `file://`.
+- `deploy/cloudflare/_redirects` — `/walk` и `/walk/*` → `/` (301): раньше там жила отдельная версия с ходьбой, теперь ходьба — часть основной игры.
 - `deploy/cloudflare/404.html` — на любой несуществующий путь возвращает на `/` (без него Pages отдаёт `index.html` на любой адрес со статусом 200).
-- Квест и версия с ходьбой живут на одном домене и делят `localStorage`, поэтому у партий разные ключи (`SAVE_KEYS`, см. [ARCHITECTURE](ARCHITECTURE.md#сохранение)).
 - `deploy/cloudflare/_headers` — заголовки для всех путей:
 
 | Заголовок | Значение | Зачем |
@@ -96,7 +96,7 @@ Workflow использует окружение `production` (Settings → Envi
 
 ## Обновление
 
-Обычный цикл: изменения → pull request (e2e + preview) → merge в `main` → автодеплой (e2e параллельно). Каждый деплой виден в **Workers & Pages → el-sueno → Deployments** с хешем коммита.
+Обычный цикл: изменения в ветке `feature/…` (e2e + preview на каждый push) → pull request → merge в `main` → автодеплой (e2e параллельно). Каждый деплой виден в **Workers & Pages → el-sueno → Deployments** с хешем коммита.
 
 Ручной деплой с локальной машины (минуя CI — только в крайнем случае, тесты не запускаются):
 

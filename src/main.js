@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { $ } from '../../shared/util.js';
-import { game, Game } from './game.js';
+import { $ } from './shared/util.js';
+import { game, Game } from './shared/game.js';
 /* Punto de entrada: esbuild empaqueta desde aquí todo el juego (y three.js) en un IIFE dentro del HTML. */
 
 /* ---------- arranque con comprobación de requisitos ---------- */

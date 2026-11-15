@@ -1,30 +1,34 @@
 import { $, esc, clamp } from './util.js';
-import { LEGACY_SAVE_KEY, SET_KEY, MAX_SLOTS, ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS, SYMBOLS, PLATE_ORDER, PRAYER, SOLUTION } from './data.js';
+import { SET_KEY, MAX_SLOTS, ZONES, ITEMS, DOCS, LEX, ARCHIVE, ECOS, SYMBOLS, PLATE_ORDER, PRAYER, SOLUTION } from './data.js';
 /* =====================================================================
    SISTEMAS: guardado, idioma, inventario, archivo, diálogo, enigma,
    interacción e interfaz.
    ===================================================================== */
-/* ---------- SaveManager: LocalStorage con validación y tolerancia a datos dañados ---------- */
+/* ---------- SaveManager: LocalStorage con validación y tolerancia a datos dañados ----------
+   Formato v2: una sola partida para el juego híbrido. scr: plano fijo actual o null (en la calle);
+   pos: posición en la calle; ret: punto de la calle al que se vuelve al salir de un plano. */
 export class SaveManager {
-  /** key: clave de la partida; legacy: heredar el guardado común antiguo; validScr: id de plano válido (quest). */
-  constructor({ key, legacy = false, validScr } = {}) { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {};
-    this.key = key; this.validScr = validScr || (() => false); if (legacy) this.migrate(); }
-  /** El guardado común de antes (LEGACY_SAVE_KEY) pasa al quest y se borra: la versión de caminar empieza de cero. */
-  migrate() { const old = this._get(LEGACY_SAVE_KEY); if (old === null) return; if (this._get(this.key) === null) this._set(this.key, old); try { this.ok ? localStorage.removeItem(LEGACY_SAVE_KEY) : delete this.mem[LEGACY_SAVE_KEY]; } catch (e) {} }
+  /** key: clave de la partida; from: claves de partidas antiguas (v1) que se heredan, por orden; validScr: id de plano válido. */
+  constructor({ key, from = [], validScr } = {}) { this.ok = true; try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); } catch (e) { this.ok = false; } this.mem = {};
+    this.key = key; this.validScr = validScr || (() => false); this.migrate(from); }
+  /** v1 → v2. Antes había dos juegos (quest y caminar) con partidas separadas; el híbrido hereda la primera que exista.
+      Las partidas antiguas no se borran. El quest guardaba el plano (scr); la versión de caminar, solo la posición. */
+  migrate(from) { if (this._get(this.key) !== null) return;
+    for (const k of from) { const raw = this._get(k); if (!raw) continue; try { const s = JSON.parse(raw); if (!s || typeof s !== 'object' || s.v !== 1) continue; s.v = 2; if (typeof s.scr !== 'string') s.scr = null; s.ret = null; this._set(this.key, JSON.stringify(s)); return; } catch (e) {} } }
   _get(k) { try { return this.ok ? localStorage.getItem(k) : this.mem[k] || null; } catch (e) { return null; } }
   _set(k, v) { try { if (this.ok) localStorage.setItem(k, v); else this.mem[k] = v; return true; } catch (e) { return false; } }
-  fresh() { return { v: 1, scr: 'callejon1', pos: { x: 0, z: -1.6, ry: Math.PI }, flags: {}, inv: [], docs: [], words: [], archive: [], ecos: [], decisions: [], log: [], cordura: 100, time: 0, tries: 0 }; }
+  fresh() { return { v: 2, scr: null, ret: null, pos: { x: 0, z: -1.6, ry: Math.PI }, flags: {}, inv: [], docs: [], words: [], archive: [], ecos: [], decisions: [], log: [], cordura: 100, time: 0, tries: 0 }; }
   /** Devuelve un estado válido o null. Un guardado corrupto se descarta sin romper el juego. */
   load() {
     const raw = this._get(this.key); if (!raw) return null;
     try {
-      const s = JSON.parse(raw), b = this.fresh(); if (!s || typeof s !== 'object' || s.v !== 1) throw new Error('versión');
+      const s = JSON.parse(raw), b = this.fresh(); if (!s || typeof s !== 'object' || s.v !== 2) throw new Error('versión');
       const arr = (a, ok) => Array.isArray(a) ? a.filter(ok) : [];
       b.flags = (s.flags && typeof s.flags === 'object' && !Array.isArray(s.flags)) ? s.flags : {};
       b.inv = arr(s.inv, x => ITEMS[x]).slice(0, MAX_SLOTS); b.docs = arr(s.docs, x => DOCS[x]); b.archive = arr(s.archive, x => ARCHIVE[x]); b.ecos = arr(s.ecos, x => ECOS[x]);
       b.words = arr(s.words, x => typeof x === 'string'); b.decisions = arr(s.decisions, x => typeof x === 'string'); b.log = arr(s.log, x => x && typeof x.t === 'string').slice(-60);
       if (s.pos && isFinite(s.pos.x) && isFinite(s.pos.z)) b.pos = { x: clamp(+s.pos.x, -13, 23), z: clamp(+s.pos.z, -100, 2), ry: isFinite(s.pos.ry) ? +s.pos.ry : 0 };
-      if (typeof s.scr === 'string' && this.validScr(s.scr)) b.scr = s.scr; b.cordura = isFinite(s.cordura) ? clamp(+s.cordura, 10, 100) : 100; b.time = isFinite(s.time) ? +s.time : 0; b.tries = isFinite(s.tries) ? +s.tries : 0;
+      if (typeof s.scr === 'string' && this.validScr(s.scr)) b.scr = s.scr; if (b.scr && s.ret && isFinite(s.ret.x) && isFinite(s.ret.z)) b.ret = { x: clamp(+s.ret.x, -13, 13), z: clamp(+s.ret.z, -100, 2), ry: isFinite(s.ret.ry) ? +s.ret.ry : 0 }; b.cordura = isFinite(s.cordura) ? clamp(+s.cordura, 10, 100) : 100; b.time = isFinite(s.time) ? +s.time : 0; b.tries = isFinite(s.tries) ? +s.tries : 0;
       return b;
     } catch (e) { console.warn('Guardado dañado: se ignora.', e); try { this.ok && localStorage.removeItem(this.key); } catch (_) {} return null; }
   }
@@ -109,8 +113,8 @@ export class PuzzleSystem {
 
 /* ---------- UIManager ---------- */
 export class UIManager {
-  /** help: ayuda de controles (HTML) del modo; badge: tecla/botón de acción junto al verbo. */
-  constructor(game, { help = '', badge = false } = {}) { this.game = game; this.help = help; this.badge = badge; this.modal = null; this.tab = 0; this.selItem = null; this.combine = false; this.selDoc = null; this.selArch = null; this.docRes = null; this.flashT = 0; this.bind(); }
+  /** badge: tecla/botón de acción junto al verbo cuando el objeto está al alcance. */
+  constructor(game, { badge = false } = {}) { this.game = game; this.badge = badge; this.modal = null; this.tab = 0; this.selItem = null; this.combine = false; this.selDoc = null; this.selArch = null; this.docRes = null; this.flashT = 0; this.bind(); }
   bind() { const g = this.game; document.addEventListener('pointerdown', () => { this.pdT = performance.now(); }, true);
     // un botón con foco se activaría con Espacio/Intro al avanzar el diálogo: se le quita el foco
     document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }, true);
@@ -119,14 +123,13 @@ export class UIManager {
     $('doc').addEventListener('click', e => { if (!e.target.closest('.w') && !this.guarded()) this.closeDoc(); });
     $('pause').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (!b) return; const a = b.dataset.p; g.audio.ui();
       if (a === 'resume') g.togglePause(); else if (a === 'save') { g.saveNow(); this.toast('Partida guardada'); g.togglePause(); } else if (a === 'book') { this.modal = null; $('pause').classList.add('hidden'); this.openBook(1); }
-      else if (a === 'mute') { g.setMuted(!g.audio.muted); this.syncSound(); } else if (a === 'voz') { g.audio.voz = !g.audio.voz; g.saveSettings(); this.syncSound(); } else if (a === 'title') { g.saveNow(); location.reload(); } });
+      else if (a === 'mute') { g.setMuted(!g.audio.muted); this.syncSound(); } else if (a === 'voz') { g.audio.voz = !g.audio.voz; g.saveSettings(); this.syncSound(); } else if (a === 'modo') g.toggleModo(); else if (a === 'joy') g.toggleJoy(); else if (a === 'title') { g.saveNow(); location.reload(); } });
     $('volR').addEventListener('input', e => { g.audio.setVolume(e.target.value / 100); g.saveSettings(); });
     // consulta de palabras: toque o clic sobre una palabra subrayada
     document.addEventListener('click', e => { const w = e.target.closest && e.target.closest('.w'); const tip = $('tip'); if (!w) { tip.classList.add('hidden'); return; }
       const en = g.lang.entry(w.dataset.k); if (!en) return; tip.innerHTML = `<b>${esc(en.k)}</b>${esc(en.d)}<em>«${esc(en.e)}»</em>`; tip.classList.remove('hidden'); w.classList.remove('new');
       const r = w.getBoundingClientRect(), tw = Math.min(290, window.innerWidth - 16); tip.style.left = clamp(r.left + r.width / 2 - tw / 2, 8, window.innerWidth - tw - 8) + 'px'; tip.style.top = ''; tip.style.bottom = (window.innerHeight - r.top + 8) + 'px';
       if (r.top < 150) { tip.style.bottom = ''; tip.style.top = (r.bottom + 8) + 'px'; } }, true);
-    $('keysHelp').innerHTML = this.help;
   }
   /* Tras abrir un panel con un toque, el «click» sintético del mismo toque cae sobre el panel: se ignora un instante. */
   guard() { this.openT = performance.now(); }

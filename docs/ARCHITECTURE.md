@@ -2,32 +2,60 @@
 
 ## Обзор
 
-Игра — один самодостаточный HTML-файл на версию. Код — ES-модули с явными `import`/`export`: общий — в `src/shared/`, различия режимов — в `src/modes/`. `build.js` запускает esbuild (точная версия в `devDependencies`): bundle от `main.js` режима вместе с three.js (`import * as THREE from 'three'`, r149), формат IIFE, минификация, `target: es2020`. Результат встраивается в обычный `<script>` внутри `shell.html` (плейсхолдер `/*__GAME__*/`), поэтому файл работает через `file://`, без сервера и без `type="module"`.
+Игра — один самодостаточный HTML-файл (`dist/el-sueno.html`). Код — ES-модули с явными `import`/`export`: общий — в `src/shared/`, поведение двух видов сцен — в `src/modes/walk/` (улица, ходьба) и `src/modes/frame/` (кадр с активными точками). `build.js` запускает esbuild (точная версия в `devDependencies`): bundle от `src/main.js` вместе с three.js (`import * as THREE from 'three'`, r149), формат IIFE, минификация, `target: es2020`. Результат встраивается в обычный `<script>` внутри `src/shell.html` (плейсхолдер `/*__GAME__*/`), поэтому файл работает через `file://`, без сервера и без `type="module"`.
 
 ```mermaid
 flowchart LR
     subgraph shared[src/shared — общий код]
         util[util.js] & data[data.js] & audio[audio.js] & textures[textures.js] & characters[characters.js]
-        world[world.js] & player[player.js] & systems[systems.js] & scripts[scripts.js]
+        world[world.js] & player[player.js] & systems[systems.js] & scripts[scripts.js] & scenes[scenes.js]
+        game[game.js — Game]
     end
-    subgraph modes[src/modes — различия]
-        frame[frame/screens.js<br/>кадры + активные точки]
-        quest[quest/ game.js main.js shell.html]
-        walk[walk/ game.js main.js interaction.js shell.html]
+    subgraph walk[src/modes/walk — улица]
+        input[input.js] & interaction[interaction.js] & wchase[chase.js]
     end
-    three[three r149]
-    esb{{build.js<br/>esbuild: bundle, IIFE, minify}}
-    shared & three -.-> quest & walk
-    frame -.-> quest
-    quest -->|main.js + shell.html| esb --> q[dist/el-sueno.html]
-    walk -->|main.js + shell.html| esb --> w[dist/el-sueno-walk.html]
+    subgraph frame[src/modes/frame — кадр]
+        hotspots[hotspots.js] & fchase[chase.js]
+    end
+    walk & frame -.-> game
+    three[three r149] -.-> main
+    game --> main[src/main.js]
+    main & shell[src/shell.html] --> esb{{build.js<br/>esbuild: bundle, IIFE, minify}} --> out[dist/el-sueno.html<br/>~580 KB]
 ```
-
-Пока это две сборки с общим кодом: у квеста и версии с ходьбой свой класс `Game` (`src/modes/*/game.js`), разметка и точка входа. Следующий шаг — один рантайм-гибрид, где у сцены есть `mode: 'walk' | 'frame'` (см. `docs/ROADMAP.md`).
 
 `build.js` экранирует `</script` внутри бандла, чтобы встроенный скрипт не закрылся раньше времени, и использует функцию-заменитель в `String.replace`, чтобы `$` в коде не интерпретировался как шаблон подстановки. `package.json` объявляет `"type": "module"`: так `node --check` (хук после правки) понимает `import`, а `build.js` и `scripts/site.js` сами написаны как ESM.
 
 Глобальных объявлений нет. Для тестов `main.js` выставляет `window.__sueno` (экземпляр `Game`) и `__sueno.three` (`THREE.REVISION`).
+
+## Гибрид: улица и кадры, два режима игры
+
+Один рантайм, одна сборка. В каждый момент игрок находится в одном из двух состояний:
+
+| | Улица (`game.scr === null`) | Кадр (`game.scr` = id из `SCREENS`) |
+|---|---|---|
+| Что это | свободная ходьба: callejón, plaza, pasaje, подход к puerta | статичный план: tienda, quiosco, cabina, banco (Anselmo), pedestal |
+| Ввод | `WalkInput`: WASD/стрелки, тап или клик по земле (герой идёт к точке), джойстик — опция | клики и тапы по кружкам и кнопкам выходов |
+| Объекты | `InteractionSystem`: ближайший объект + `E`, клик/тап по объекту (герой подходит сам) | `HotspotSystem`: кружки `.hs` поверх проекции, панель `#nav` |
+| Камера | по зонам (`CAMS[].test`) | камера кадра (`cams.base`) |
+
+Переключение делает `Game`: `setScreen(id)` / `toStreet(pt)` без перехода, `goTo(id)`, `enterFrame(id)`, `exitFrame()` — с затемнением и звуком шагов. `syncHud()` прячет или показывает джойстик, `HotspotSystem.build()` — точки и выходы.
+
+**Как попадают в кадр (режим normal).** У сцен в `SCREENS` есть `mode`:
+
+- `mode: 'frame'` — кадр и в обычном режиме. Объект улицы, указанный в `hs` такой сцены (`periodico`, `telefono`, `anselmo`, `venda`, `pedestal`), при взаимодействии сначала открывает кадр (`frameOf(id)` → `Game.play` → `enterFrame`), затем выполняется его сценарий: разговор с Anselmo — это постановочный кадр. В tienda входят через дверь: триггер в `Game.events` срабатывает, когда герой пересекает открытый проём.
+- `mode: 'walk'` — в обычном режиме это улица; как кадр сцена существует только в «Modo lectura».
+- «→ Salir» (`exitFrame`) возвращает на улицу в точку входа (`state.ret`; если её нет — `out` сцены). `leaveIf(f)` закрывает кадр сам после сценария (pedestal — когда дверь открыта).
+
+**Режимы игры** — настройка игрока (`modo` в настройках, кнопка на титуле и в паузе), а не отдельные сборки:
+
+- **Modo: normal** (по умолчанию) — гибрид, описанный выше. Погоня в pasaje идёт в реальном времени (`modes/walk/chase.js`): идти навстречу преследователю — значит «посмотреть назад».
+- **Modo: lectura** — все сцены — кадры, герой не ходит; между кадрами ведут выходы `exits`. Погоня — три выбора на время (`modes/frame/chase.js`, `chaseSeq`). Это бывшая квест-версия.
+
+`Game.applyModo()` приводит партию в соответствие с режимом при старте, загрузке и смене настройки: улица ↔ кадр того же места (`screenAt(x, z)` и `at` сцены). Сменить режим нельзя во время сценария, перехода и погони. Флаги, предметы и решения общие, сохранение одно.
+
+**Движение к точке** (`WalkInput.goTo`): направление на цель в мировых координатах; если герой не продвигается (упёрся в коллайдер), на короткое время отклоняется вбок, чередуя стороны и увеличивая время обхода; после нескольких неудач останавливается. Клавиши и джойстик отменяют движение к точке.
+
+**Надписи на улице** (`auto: true` у `grafiti`, `pared`, `placa`): когда герой впервые оказывается рядом, документ открывается сам на весь экран.
 
 ## Модули
 
@@ -39,16 +67,19 @@ flowchart LR
 | `shared/textures.js` | процедурные текстуры: `TEX`, `buildTextures`, `canvasTex`, `textTex`, `paintText`, `paintTextRaw`, `scaleBoxUV` |
 | `shared/characters.js` | модели персонажей: `buildHero`/`animateHero` (протагонист), `makeAnselmo`, `makeWatcher` (El Que Mira и тень) — только геометрия и анимация модели |
 | `shared/world.js` | `SceneManager` (зоны, свет, коллайдеры, интерактивные объекты `addInter`, `sync` по флагам), `zoneAt`, `CAMS`, `CameraManager`, `Gfx` (низкое разрешение + постпроцесс) |
-| `shared/player.js` | `Player`: позиция, движение относительно камеры, коллизии, фонарь; модель берёт из `characters.js` |
-| `shared/systems.js` | `SaveManager({ key, legacy, validScr })`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem` (выборы, в т. ч. на время), `PuzzleSystem`, `UIManager(game, { help, badge })` |
+| `shared/player.js` | `Player`: позиция, движение (относительно камеры или к точке мира), коллизии, фонарь; модель берёт из `characters.js` |
+| `shared/systems.js` | `SaveManager({ key, from, validScr })`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem` (выборы, в т. ч. на время), `PuzzleSystem`, `UIManager` |
 | `shared/scripts.js` | `SCRIPTS` — сюжет, по async-функции на интерактивный объект; `DRINKS` |
-| `modes/frame/screens.js` | `SCREENS` (11 кадров) и `HotspotSystem` (кружки поверх проекции, панель переходов) |
-| `modes/quest/game.js` | `Game` квеста: кадры, переходы `goTo`, погоня `chaseSeq` через выборы на время, ввод по точкам; `game` (live binding) |
-| `modes/walk/game.js`, `interaction.js` | `Game` версии с ходьбой: WASD/джойстик, камеры по зонам, погоня в реальном времени; `InteractionSystem` (ближайший объект, луч от указателя) |
-| `modes/*/main.js` | проверка WebGL, `new Game().boot()`, `window.__sueno` |
-| `modes/*/shell.html` | разметка и CSS режима, плейсхолдер `/*__GAME__*/` |
+| `shared/scenes.js` | `SCREENS` — сцены (`mode`, камера, место героя, точки, выходы), `frameOf(id)`, `screenAt(x, z)` |
+| `shared/game.js` | `Game`: состояние, цикл, переходы между улицей и кадрами, режимы, события зон, ввод; `game` (live binding) |
+| `modes/walk/input.js` | `WalkInput`: клавиши, джойстик, движение к точке с обходом препятствий |
+| `modes/walk/interaction.js` | `InteractionSystem`: ближайший объект, луч от указателя, точка земли под указателем |
+| `modes/walk/chase.js` | погоня в реальном времени: `startChase`, `updateChase`, `endChase` |
+| `modes/frame/hotspots.js` | `HotspotSystem`: кружки поверх проекции, панель выходов |
+| `modes/frame/chase.js` | `chaseSeq` — погоня через выборы на время (Modo lectura) |
+| `main.js`, `shell.html` | проверка WebGL, `new Game().boot()`, `window.__sueno`; разметка и CSS |
 
-Общие модули импортируют только `shared/` (режимы — только сверху вниз). `SceneManager` обращается к игре через `this.game`. Действия на верхнем уровне — только регистрация сценариев фресок и Eco в `SCRIPTS` (`scripts.js`, использует `ECOS`).
+`shared/` не зависит от `modes/`, кроме `game.js`, который их связывает. `SceneManager` обращается к игре через `this.game`. Действия на верхнем уровне — только регистрация сценариев фресок и Eco в `SCRIPTS` и таблица `frameOf` в `scenes.js`.
 
 ```mermaid
 classDiagram
@@ -73,6 +104,8 @@ classDiagram
     Game --> Player
     Game --> CameraManager : cams
     Game --> HotspotSystem : hs
+    Game --> InteractionSystem : inter
+    Game --> WalkInput : input
     HotspotSystem ..> SCREENS
     HotspotSystem ..> SceneManager : inter[]
     Game ..> SCRIPTS
@@ -83,7 +116,8 @@ classDiagram
 1. `main.js` проверяет WebGL; при ошибке показывает экран `#err` с текстом на испанском.
 2. `new Game().boot()`: создаёт подсистемы, строит мир (`SceneManager.build`), игрока, камеры, точки; применяет флаги пустого состояния; вешает ввод; запускает `requestAnimationFrame`. Экземпляр доступен как `window.__sueno` (используется тестами).
 3. Экран заголовка: «Continuar» (если есть сохранение), «Nueva partida» (с подтверждением, если сохранение есть), звук.
-4. `Game.start(isNew)`: `audio.init()` (нужен жест пользователя), загрузка состояния, `setScreen(state.scr)`, `sync()`, интро для новой игры.
+3а. Там же — кнопка режима «Modo: normal / lectura».
+4. `Game.start(isNew)`: `audio.init()` (нужен жест пользователя), загрузка состояния, `setScreen(state.scr)` или `toStreet(state.pos)`, `applyModo()`, `sync()`, интро для новой игры.
 
 ## Состояние и поток данных
 
@@ -122,8 +156,8 @@ flowchart LR
 flowchart TD
     A[update dt] --> B{frozen?<br/>модальное окно или не play}
     B -- нет --> C[подъём героя после интро/обморока]
-    C --> D["Player.update (анимация, без движения)"]
-    D --> E[state.time += dt; events: первый вход в зону]
+    C --> D["Player.update: на улице — ввод WalkInput, в кадре — без движения"]
+    D --> E[state.time += dt; events: первый вход в зону, триггеры улицы, погоня]
     E --> F[dread затухает; cordura восстанавливается до 80]
     F --> G{pendingFaint?}
     G -- да --> G1[faint]
@@ -132,7 +166,7 @@ flowchart TD
     B -- да --> J
     I --> J[CameraManager.update]
     J --> K[SceneManager.update: двери, туман, свет, блики]
-    K --> L[HotspotSystem.update: проекция точек, панель выходов]
+    K --> L[улица: InteractionSystem.update · кадр: HotspotSystem.update]
     L --> M[AudioManager.update: микс по зоне и угрозе]
     M --> N[пост-эффект: fear, red]
     N --> O[HUD: состояние рассудка]
@@ -141,25 +175,26 @@ flowchart TD
 
 **Рендер** (`Gfx`): сцена рисуется в render target низкого разрешения (высота ≤ 540 px), затем полноэкранный шейдер добавляет хроматическую аберрацию, зерно, виньетку, сканлайны, тонирование; uniforms `fear` (угроза/низкий рассудок) и `red` (после открытия двери) усиливают эффекты.
 
-**Камеры** (`CameraManager`): у каждого кадра своя фиксированная камера из `CAMS` (`pos`, `fov`, либо `fixed` — точка взгляда, либо слежение за героем с высотой `yoff`). `cams.force` временно перебивает камеру кадра (погоня — `pasaje2`, открытие двери — `verja`). В портретной ориентации FOV расширяется.
+**Камеры** (`CameraManager`): на улице камера выбирается по зоне (`test(x, z)`), у каждого кадра своя камера из `CAMS` (`pos`, `fov`, либо `fixed` — точка взгляда, либо слежение за героем с высотой `yoff`). `cams.force` временно перебивает камеру кадра (погоня — `pasaje2`, открытие двери — `verja`). В портретной ориентации FOV расширяется.
 
 ## Сцены и активные точки
 
-`SCREENS` (`modes/frame/screens.js`) — 11 кадров. Кадр задаёт:
+`SCREENS` (`shared/scenes.js`) — 12 сцен (11 мест и крупный план pedestal). Сцена задаёт:
 
+- `mode` — `'walk'` или `'frame'` (см. «Гибрид»); `out` — точка улицы по умолчанию при выходе; `leaveIf` — когда кадр закрывается сам;
 - `cam` — id камеры из `CAMS`;
 - `at`, `ry` — где стоит и куда смотрит герой;
 - `hs` — список id активных точек;
-- `exits` — выходы: `{ label, to }` или `{ label, act: async g => … }`, с необязательным условием `if: f => …`.
+- `exits` — выходы в «Modo lectura»: `{ label, to }` или `{ label, act: async g => … }`, с необязательным условием `if: f => …`. В обычном режиме у кадра один выход — «Salir».
 
 Активная точка — это объект `it` из `SceneManager.addInter(id, x, z, opts)`: невидимый hitbox в 3D (его позиция проецируется на экран), блик-спрайт, глагол (`verb`) и условие `on()`. `HotspotSystem`:
 
 - `build()` — при смене кадра создаёт по кнопке `.hs` на каждую точку кадра;
 - `update()` — каждый кадр проецирует hitbox в экранные координаты (с прижатием к краям для портретного экрана), прячет выключенные точки и все точки, пока `!canAct()`; перерисовывает панель выходов `#nav`, только если изменилась её сигнатура;
-- клик по точке → `Game.interact(it)` → `Game.run(SCRIPTS[id])`;
+- клик по точке → `Game.interact(it)` → `Game.run(g => g.play(id))` → `SCRIPTS[id]`;
 - клик по выходу → `goTo(to)` (затемнение + шаги) или `run(act)`.
 
-`Game.canAct()` = режим `play`, нет сценария (`busy`), нет перехода (`going`), нет модального окна и диалога. Пока сценарий выполняется, точки и выходы скрыты — это защищает от двойных действий.
+`Game.canAct()` = режим `play`, нет сценария (`busy`), нет перехода (`going`), нет модального окна, диалога и погони. `Game.canMove()` — то же, но погоня не мешает (идти можно). Пока сценарий выполняется, точки и выходы скрыты — это защищает от двойных действий.
 
 ## Сценарии
 
@@ -217,7 +252,8 @@ sequenceDiagram
 
 | Клавиша | Действие |
 |---|---|
-| E / Space / Enter | продолжить реплику, выбрать подсвеченный вариант, закрыть документ |
+| W A S D / стрелки, Shift | ходьба и бег (на улице) |
+| E / Space / Enter | действие с ближайшим объектом (на улице), продолжить реплику, выбрать подсвеченный вариант, закрыть документ |
 | 1–9 | выбрать вариант |
 | ↑ ↓ / W S | перемещение по вариантам |
 | Tab | инвентарь |
@@ -226,15 +262,15 @@ sequenceDiagram
 | M | звук вкл/выкл |
 | Esc | закрыть окно / пауза |
 
-Мышь и касание — по точкам, выходам, словам. Касание выставляет `body.touch` (другая раскладка подсказок). Жесты масштабирования, двойной тап и контекстное меню подавлены; прокрутка разрешена только в `.pbody`, `#docBody`, `.scroll`.
+Мышь и касание — по точкам, выходам, словам; на улице клик или тап по земле ведёт героя к точке, по объекту — к объекту с действием по прибытии. Джойстик (`#touch`) включается в паузе («Joystick: sí») и виден только на улице. Касание выставляет `body.touch` (другая раскладка подсказок). Жесты масштабирования, двойной тап и контекстное меню подавлены; прокрутка разрешена только в `.pbody`, `#docBody`, `.scroll`.
 
 ## Сохранение
 
 `SaveManager` (`systems.js`):
 
-- ключи `localStorage` (`data.js`): `SAVE_KEYS.quest` = `el_sueno_cap1_quest_v1` — партия квеста, `SAVE_KEYS.walk` = `el_sueno_cap1_walk_v1` — партия версии с ходьбой, `el_sueno_ajustes_v1` — громкость/звук/озвучка (общие для обеих версий). Ключ партии хранится в `SaveManager.key`;
-- обе версии живут на одном домене (`/` и `/walk/`, а через `file://` — в одном origin) и делят `localStorage`, поэтому ключи партий разные;
-- миграция: старое общее сохранение `LEGACY_SAVE_KEY` (`el_sueno_cap1_v1`) при первом запуске квеста переносится в `SAVE_KEYS.quest` (если там пусто) и удаляется (`SaveManager.migrate`). Версия с ходьбой его не читает и начинает с чистого листа. Формат `state` не менялся, `v` остаётся `1`. Покрыто `tests/e2e_saves.py`;
+- ключи `localStorage` (`data.js`): `SAVE_KEYS.hybrid` = `el_sueno_cap1_v2` — партия; `el_sueno_ajustes_v1` — настройки: громкость, звук, озвучка, `modo` (`normal`/`lectura`), `joy` (джойстик);
+- формат `v: 2`: к полям v1 добавлены `scr` — текущий кадр или `null` (герой на улице, тогда важна `pos`) и `ret` — точка улицы, куда вернёт «Salir»;
+- миграция v1 → v2 (`SaveManager.migrate`): если партии v2 нет, берётся первая из старых — квест (`el_sueno_cap1_quest_v1`), общий ключ (`el_sueno_cap1_v1`), ходьба (`el_sueno_cap1_walk_v1`). Квест хранил кадр (`scr`), ходьба — только позицию; `Game.applyModo()` при загрузке превращает кадр-улицу в точку на улице. Старые ключи не удаляются. Покрыто `tests/e2e_saves.py`;
 - если `localStorage` недоступен (приватный режим, `file://` с ограничениями) — хранение в памяти, на титульном экране предупреждение «Este navegador no guarda la partida.»;
 - когда сохраняется: `saveSoon()` (debounce 400 мс) после флагов, предметов, архива, переходов; автосохранение раз в 15 с при `canAct()`; при открытии паузы; кнопка «Guardar partida»; `visibilitychange` (скрытие вкладки); `pagehide`.
 
@@ -242,14 +278,15 @@ sequenceDiagram
 
 | Поле | Проверка |
 |---|---|
-| весь объект | JSON-объект с `v === 1`, иначе сохранение удаляется |
+| весь объект | JSON-объект с `v === 2`, иначе сохранение удаляется |
 | `flags` | объект (не массив), иначе `{}` |
 | `inv` | только существующие id `ITEMS`, не больше `MAX_SLOTS` (6) |
 | `docs`, `archive`, `ecos` | только существующие id `DOCS`, `ARCHIVE`, `ECOS` |
 | `words`, `decisions` | только строки |
 | `log` | записи со строковым `t`, последние 60 |
 | `pos` | конечные числа, зажаты в границы карты |
-| `scr` | существующий id `SCREENS`, иначе `callejon1` |
+| `scr` | существующий id `SCREENS`, иначе `null` (улица) |
+| `ret` | только вместе с `scr`: конечные числа, зажаты в границы карты |
 | `cordura` | число, зажато в `[10, 100]` |
 | `time`, `tries` | конечные числа |
 

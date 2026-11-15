@@ -1,12 +1,13 @@
 # EL SUEÑO — Capítulo I: La Ciudad Vacía
 
-Браузерный психологический хоррор в формате кинематографичного квеста (в духе Telltale / Snatcher) для изучения испанского языка.
+Браузерный психологический хоррор с фиксированными камерами для изучения испанского языка: по улицам пустого города вы ходите, а интерьеры и разговоры — постановочные кадры с активными точками.
 
-Вы просыпаетесь в пустом туманном городе и не помните своего имени. Телефон в будке называет вас «paciente siete», слепой фонарщик просит апельсиновую газировку, а на стене переулка написано «NO MIRES ATRÁS». Вы не ходите — смотрите на фиксированные кадры, нажимаете на активные точки, читаете документы и выбираете реплики. **Весь игровой текст — на испанском (Испания, уровень A1)**, и почти каждое препятствие решается пониманием фразы.
+Вы просыпаетесь в пустом туманном городе и не помните своего имени. Телефон в будке называет вас «paciente siete», слепой фонарщик просит апельсиновую газировку, а на стене переулка написано «NO MIRES ATRÁS». Вы ходите по туманным улицам, заходите в магазин, читаете документы и выбираете реплики; весь текст — на испанском уровня A1, и понимание текста меняет мир. Есть «Modo lectura» — без ходьбы, только кадры и выборы.
 
 ![Переулок — первый кадр главы I](docs/img/callejon.png)
 
-- Глава I: 5 зон, 11 кадров, погоня, загадка, финал.
+- Глава I: 5 зон, улицы с ходьбой и 5 постановочных кадров, погоня в реальном времени, загадка, финал.
+- Два режима в одной игре: «Modo: normal» (ходьба + кадры) и «Modo: lectura» (только кадры и выборы); управление мышью, клавиатурой и тачем (тап по земле, джойстик — опция).
 - 76 слов в словаре с определениями на простом испанском; подсветка новых слов прямо в тексте.
 - Cuaderno (документы и голоса), Archivo (факт / свидетельство / гипотеза), Ecos.
 - Процедурная графика (three.js) и процедурный звук (Web Audio); озвучка через синтез речи браузера.
@@ -14,7 +15,7 @@
 
 ## Как запустить:
 
-Откройте **`dist/el-sueno.html`** двойным кликом — сервер не нужен. Версия с ходьбой (WASD и джойстик) — `dist/el-sueno-walk.html`, онлайн — `/walk/`. Нужен браузер с WebGL (Chrome, Firefox, Edge, Safari). Рекомендуются наушники.
+Откройте **`dist/el-sueno.html`** двойным кликом — сервер не нужен. Нужен браузер с WebGL (Chrome, Firefox, Edge, Safari). Рекомендуются наушники.
 
 Если браузер ограничивает `file://`, можно поднять локальный сервер:
 
@@ -22,7 +23,7 @@
 npm run serve   # http://localhost:8080/el-sueno.html
 ```
 
-**Управление:** клик/касание по кружкам — осмотреть, прочитать, поговорить; кнопки «→» внизу — сменить место. Клавиатура: `E`/`Space` — дальше, `1–9` — выбрать ответ, `Tab` — инвентарь, `J` — Cuaderno, `F` — фонарь, `M` — звук, `Esc` — пауза. Нажатие на подчёркнутое слово показывает его значение.
+**Управление:** на улице — `W A S D`/стрелки (с `Shift` — бег) или клик/тап по земле: герой идёт к точке; клик/тап по объекту или `E` рядом с ним — действие. В кадре — клик/касание по кружкам; «→ Salir» возвращает на улицу. На телефоне в паузе можно включить джойстик. Клавиатура: `E`/`Space` — действие и дальше, `1–9` — выбрать ответ, `Tab` — инвентарь, `J` — Cuaderno, `F` — фонарь, `M` — звук, `Esc` — пауза. Нажатие на подчёркнутое слово показывает его значение.
 
 ## Как собрать
 
@@ -30,14 +31,14 @@ npm run serve   # http://localhost:8080/el-sueno.html
 
 ```sh
 npm install      # ставит three@0.149.0
-npm run build    # → dist/el-sueno.html и dist/el-sueno-walk.html (~570 KB каждый)
+npm run build    # → dist/el-sueno.html (~580 KB)
 ```
 
-`build.js` собирает каждую версию esbuild'ом из ES-модулей (общий код — `src/shared/`, режимы — `src/modes/`; точка входа `src/modes/quest/main.js` или `src/modes/walk/main.js`, three.js через `import`) в один IIFE и встраивает его в `shell.html` — получается один HTML, который открывается через `file://`. Подробнее — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`build.js` собирает игру esbuild'ом из ES-модулей (общий код — `src/shared/`, поведение улицы и кадров — `src/modes/walk/` и `src/modes/frame/`; точка входа `src/main.js`, three.js через `import`) в один IIFE и встраивает его в `src/shell.html` — получается один HTML, который открывается через `file://`. Подробнее — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Как тестировать
 
-Сквозной тест `tests/e2e.py` проходит всю главу в headless Chromium (Playwright, Python): 52 проверки на десктопе, 54 в мобильной эмуляции (тач, 667×375, затем портрет 390×760). Скриншоты — в `tests/screenshots/`.
+Сквозные тесты проходят всю главу в headless Chromium (Playwright, Python): `tests/e2e.py` — основной режим (81 проверка на десктопе, мобильная эмуляция с тачем — аргумент `m`), `tests/e2e_lectura.py` — «Modo lectura» (53 и 55), `tests/e2e_saves.py` — сохранения и миграция старых партий. Скриншоты — в `tests/screenshots/`.
 
 Один раз установить зависимости (Python 3.9+):
 
@@ -50,10 +51,10 @@ npm run test:setup   # pip install -r requirements.txt + браузер Chromium
 Запуск (с активированным `.venv`):
 
 ```sh
-npm test              # сборка + десктоп
-npm run test:mobile   # сборка + мобильная эмуляция
-npm run test:walk     # сборка + версия с ходьбой: прохождение (десктоп) и тач-управление
-npm run test:saves    # сборка + сохранения квеста и ходьбы не мешают друг другу
+npm test              # сборка + основной режим, десктоп
+npm run test:mobile   # сборка + основной режим, мобильная эмуляция
+npm run test:lectura  # сборка + «Modo lectura», десктоп и мобильный
+npm run test:saves    # сборка + сохранения: формат v2 и миграция старых партий
 npm run test:all      # всё подряд
 ```
 
@@ -64,7 +65,7 @@ npm run test:all      # всё подряд
 Игра публикуется на **Cloudflare Pages** через GitHub Actions: на каждый push в `main` — деплой (параллельно с e2e, от тестов не зависит), на каждый PR — preview-деплой и e2e. Заголовки безопасности и кеширования — в `deploy/cloudflare/_headers`.
 
 ```sh
-npm run build:site  # site/: index.html (квест), walk/index.html (ходьба), _headers, 404.html
+npm run build:site  # site/: index.html, _headers, _redirects (/walk/ → /), 404.html
 npm run deploy      # ручной деплой через wrangler (минуя CI, только в крайнем случае)
 ```
 
@@ -74,16 +75,18 @@ npm run deploy      # ручной деплой через wrangler (минуя 
 
 ```
 ├── src/
-│   ├── shared/        общий код: data.js (контент), audio.js, textures.js, characters.js (модели персонажей),
-│   │                  world.js (зоны, камеры, постпроцесс), player.js, systems.js, scripts.js (сюжет), util.js
-│   └── modes/         различия режимов: frame/ (кадры и активные точки), quest/ и walk/ (Game, main.js, shell.html)
-├── dist/              собранные игры: el-sueno.html, el-sueno-walk.html
-├── tests/e2e.py       сквозной тест квеста (Playwright)
-├── tests/e2e_walk.py, e2e_walk_mobile.py  тесты версии с ходьбой
-├── tests/e2e_saves.py  сохранения двух версий
+│   ├── shared/        общий код: game.js (Game), scenes.js (сцены и их режимы), scripts.js (сюжет), data.js (контент),
+│   │                  world.js, player.js, characters.js (модели персонажей), textures.js, systems.js, audio.js, util.js
+│   ├── modes/walk/    улица: ввод и ходьба к точке, объекты рядом, погоня в реальном времени
+│   ├── modes/frame/   кадр: активные точки и выходы, погоня через выборы (Modo lectura)
+│   └── main.js, shell.html   точка входа и разметка с CSS
+├── dist/el-sueno.html собранная игра
+├── tests/e2e.py       сквозной тест основного режима (Playwright)
+├── tests/e2e_lectura.py  сквозной тест «Modo lectura»
+├── tests/e2e_saves.py  сохранения и миграция
 ├── .claude/, .mcp.json  harness Claude Code: агенты, скиллы, хуки, Playwright MCP
 ├── docs/              документация (см. ниже)
-├── deploy/cloudflare/ _headers и 404.html для Cloudflare Pages
+├── deploy/cloudflare/ _headers, _redirects и 404.html для Cloudflare Pages
 ├── scripts/site.js    подготовка каталога site/ для деплоя
 ├── .github/workflows/ CI: сборка, e2e, деплой
 ├── build.js           сборка esbuild → один HTML на версию

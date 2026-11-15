@@ -25,7 +25,7 @@ grafiti: { title: 'Pintada en la pared', cls: 'wall', where: 'El Callejón',
   text: f => f.puertaAbierta ? 'ÉL YA NO MIRA.\nAHORA MIRAS TÚ.' : f.chaseDone ? (f.miraste ? 'MIRASTE.' : 'NO MIRASTE.\nBIEN.') : 'NO MIRES ATRÁS' },
 ```
 
-- `cls` — оформление бумаги: `''` (бумага), `news` (газета, поддерживает `<h5>`), `wall` (надпись на стене), `med` (медицинский бланк), `metal` (металлическая табличка). Стили — `.paper.*` в `src/modes/quest/shell.html`.
+- `cls` — оформление бумаги: `''` (бумага), `news` (газета, поддерживает `<h5>`), `wall` (надпись на стене), `med` (медицинский бланк), `metal` (металлическая табличка). Стили — `.paper.*` в `src/shell.html`.
 - `\n` — перенос строки (`white-space: pre-line`).
 - Открыть документ из сценария: `await g.doc('calendario');` — это добавит его в Cuaderno, выучит слова и поставит флаг `doc_calendario`.
 - Финальный экран считает `Documentos n / N` по `Object.keys(DOCS).length` автоматически.
@@ -74,7 +74,7 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
    this.addInter('eco3', 21.2, -34.6, { verb: 'Escuchar', y: 1.3, eco: true, on: () => game.ecoOn('eco3') });
    ```
 
-3. Добавить id в `hs` нужного кадра в `SCREENS` (`src/modes/frame/screens.js`).
+3. Добавить id в `hs` нужного кадра в `SCREENS` (`src/shared/scenes.js`).
 
 Сценарий писать не нужно: `scripts.js` автоматически регистрирует `SCRIPTS[id]` для каждого ключа `ECOS`.
 
@@ -106,11 +106,13 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
    Всегда проверяйте результат `g.give(...)`: инвентарь ограничен 6 слотами.
 
-4. **Кадр** — добавить id в `hs` нужного кадра (`src/modes/frame/screens.js`). Кружок появится там, где hitbox проецируется на экран этой камеры.
+4. **Кадр** — добавить id в `hs` нужного кадра (`src/shared/scenes.js`). Кружок появится там, где hitbox проецируется на экран этой камеры.
 
 5. **Предмет** (если точка что-то даёт) — запись в `ITEMS` (`src/shared/data.js`) с SVG-путём иконки в квадрате 20×20; если предмет можно использовать — ветка в `Game.useItem`; если комбинировать — `Inventory.combine`.
 
 ## Добавить новую сцену (кадр)
+
+> Сцены лежат в `src/shared/scenes.js`. У сцены есть `mode`: `'walk'` — в обычном режиме это улица (кадром она бывает только в «Modo lectura»), `'frame'` — кадр в обоих режимах. Для кадра задайте `out: [x, z, ry]` — точку улицы по умолчанию при выходе. Объекты из `hs` кадра открывают его с улицы автоматически; если в кадр входят через дверь — добавьте триггер в `Game.events` (см. tienda). Любой контент должен работать в обоих режимах: проверьте `exits` для «Modo lectura» и путь пешком для обычного.
 
 1. **Камера** — запись в `CAMS` (`src/shared/world.js`):
 
@@ -120,7 +122,7 @@ venda: { cat: 'Los que no duermen', title: 'El banco vacío', tipo: 'h',
 
    `pos` — положение камеры; `fixed` — точка, куда она смотрит. Без `fixed` камера следит за героем на высоте `yoff` (по умолчанию 1.25). `test` — наследие режима с ходьбой; для новых камер ставьте `() => false`.
 
-2. **Кадр** — запись в `SCREENS` (`src/modes/frame/screens.js`):
+2. **Кадр** — запись в `SCREENS` (`src/shared/scenes.js`):
 
    ```js
    quiosco: { cam: 'quiosco', at: [-5.3, -29.6], ry: -0.6, hs: ['periodico'], exits: [{ label: 'Volver a la plaza', to: 'plaza1' }] },

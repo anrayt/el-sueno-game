@@ -4,23 +4,25 @@
 
 ## Что это
 
-EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психологический хоррор в формате кинематографичного квеста (Telltale / Snatcher). Игрок не ходит: смотрит на фиксированные 3D-кадры, нажимает на активные точки, читает документы и выбирает реплики. Весь игровой текст на испанском (Испания, уровень A1). Цель — учить испанский через сюжет.
+EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психологический хоррор с фиксированными камерами. Весь игровой текст на испанском (Испания, уровень A1). Цель — учить испанский через сюжет.
 
-## Две версии игры
+## Одна игра — два режима
 
-| Версия | Исходники | Сборка | Онлайн | Управление |
-|---|---|---|---|---|
-| **Основная — квест** | `src/modes/quest/` + `src/modes/frame/` | `dist/el-sueno.html` | `/` | Фиксированные кадры, активные точки, выборы. Тап/клик, без ходьбы |
-| **Альтернативная — с ходьбой** | `src/modes/walk/` | `dist/el-sueno-walk.html` | `/walk/` | Свободная ходьба (WASD/стрелки, джойстик на телефоне), камеры меняются по зонам, погоня в реальном времени |
+Одна сборка `dist/el-sueno.html`, онлайн — `/` (старый адрес `/walk/` перенаправляет на `/`).
 
-Сюжет (`SCRIPTS`), контент, мир, персонажи, звук и системы — общий код в `src/shared/`. Различаются только класс `Game`, разметка и ввод (`src/modes/`). Следующий шаг — гибрид в одной сборке: у каждой сцены `mode: 'walk' | 'frame'` (план согласован, см. `docs/ROADMAP.md`).
+| Режим | Что это |
+|---|---|
+| **Modo: normal** (по умолчанию) | Гибрид. Улицы (callejón, plaza, pasaje, подход к puerta) — свободная ходьба: WASD/стрелки, клик или тап по земле (герой идёт к точке), джойстик — опция в паузе. Интерьеры, осмотр вблизи и разговоры (tienda, quiosco, cabina, banco Anselmo, pedestal) — статичные кадры с активными точками; «→ Salir» возвращает на улицу в точку входа. Погоня в pasaje — в реальном времени. |
+| **Modo: lectura** | Все сцены — кадры, без ходьбы: активные точки и стрелки-выходы; погоня — три выбора на время. Это бывшая квест-версия. |
+
+Режим — настройка (титульный экран, пауза). Сюжет, флаги, предметы и сохранение общие; режим можно менять посреди партии. До гибрида были две отдельные сборки (квест и ходьба) — они остались в истории под тегом `v0.2-pre-hybrid`.
 
 ## Сборка и деплой
 
-- `npm install` (ставит three@0.149.0), затем `npm run build` → обе версии в `dist/`. Каждая — **один** HTML без внешних зависимостей, открывается двойным кликом (`file://`).
-- Код — ES-модули. `build.js` пакует esbuild'ом `main.js` версии вместе с three.js в IIFE и встраивает в `shell.html`. Глобальных объявлений нет; для тестов есть `window.__sueno`.
-- `npm run build:site` → `site/` для Cloudflare Pages (`index.html`, `walk/index.html`, `_headers`, `404.html`).
-- CI (`.github/workflows/ci.yml`): push в `main` → деплой на https://el-sueno.pages.dev (не ждёт e2e); PR → preview-деплой и ссылка в PR; e2e на push и PR. Подробно — `docs/DEPLOY.md`.
+- `npm install` (three@0.149.0, esbuild — точные версии), затем `npm run build` → `dist/el-sueno.html`: **один** HTML без внешних зависимостей, открывается двойным кликом (`file://`).
+- Код — ES-модули. `build.js` пакует esbuild'ом `src/main.js` вместе с three.js в IIFE и встраивает в `src/shell.html`. Глобальных объявлений нет; для тестов есть `window.__sueno`.
+- `npm run build:site` → `site/` для Cloudflare Pages (`index.html`, `_headers`, `_redirects`, `404.html`).
+- CI (`.github/workflows/ci.yml`): push в `main` → деплой на https://el-sueno.pages.dev (не ждёт e2e); PR и push в `feature/**` → preview-деплой; e2e на всё это. Подробно — `docs/DEPLOY.md`.
 
 ## Архитектура (`src/`)
 
@@ -28,29 +30,30 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 | Модуль | Содержимое |
 |---|---|
-| `shared/data.js` | Контент: `ZONES`, `ITEMS`, `DOCS`, `LEX` (76 слов), `ARCHIVE`, `ECOS`, символы и решение загадки; ключи сохранений `SAVE_KEYS` |
-| `shared/audio.js` | `AudioManager` — процедурный звук (Web Audio), озвучка `speechSynthesis` (es-ES) |
-| `shared/textures.js`, `characters.js` | Процедурные текстуры; модели героя, Anselmo и El Que Mira |
+| `shared/game.js` | `Game`: состояние, цикл, переходы улица ↔ кадр (`enterFrame`, `exitFrame`, `goTo`), режимы (`applyModo`), события зон, ввод |
+| `shared/scenes.js` | `SCREENS` — сцены с `mode: 'walk' \| 'frame'`, камерой, точками и выходами; `frameOf`, `screenAt` |
+| `shared/scripts.js` | `SCRIPTS` — сюжет: по async-функции на каждый интерактивный объект |
+| `shared/data.js` | Контент: `ZONES`, `ITEMS`, `DOCS`, `LEX` (76 слов), `ARCHIVE`, `ECOS`, символы и решение загадки; ключи сохранений |
 | `shared/world.js`, `player.js` | `SceneManager` (5 зон, `addInter`, `sync`), `CAMS`/`CameraManager`, `Gfx`; `Player` (движение, коллизии, фонарь) |
-| `shared/systems.js` | `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager` |
-| `shared/scripts.js` | `SCRIPTS` — сюжет: по async-функции на каждую активную точку |
-| `modes/frame/screens.js` | `SCREENS` — 11 кадров и `HotspotSystem` |
-| `modes/quest/`, `modes/walk/` | Класс `Game` режима, `main.js`, `shell.html`; у ходьбы ещё `interaction.js` |
+| `shared/characters.js`, `textures.js` | Модели героя, Anselmo и El Que Mira; процедурные текстуры |
+| `shared/systems.js`, `audio.js` | `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager`; `AudioManager` |
+| `modes/walk/` | улица: `WalkInput` (клавиши, джойстик, ходьба к точке), `InteractionSystem`, погоня в реальном времени |
+| `modes/frame/` | кадр: `HotspotSystem` (точки и выходы), `chaseSeq` (погоня через выборы) |
 
-Состояние = `state.flags` + инвентарь, документы, слова, архив, эхо, решения, кадр (квест) или позиция (ходьба). `SceneManager.sync(flags)` идемпотентно приводит мир в соответствие с флагами — так восстанавливается сохранение.
+Состояние = `state.flags` + инвентарь, документы, слова, архив, эхо, решения + где герой: `scr` (кадр или `null` — улица), `pos`, `ret` (куда вернёт «Salir»). `SceneManager.sync(flags)` идемпотентно приводит мир в соответствие с флагами — так восстанавливается сохранение.
 
-**Сохранения.** Версии на одном домене делят `localStorage`, поэтому у каждой свой ключ: `el_sueno_cap1_quest_v1` и `el_sueno_cap1_walk_v1`. Старое общее `el_sueno_cap1_v1` при первом запуске квеста переносится в квест и удаляется; ходьба начинает с нуля.
+**Сохранения.** Одна партия, формат `v: 2`, ключ `el_sueno_cap1_v2`. Партии v1 наследуются при первом запуске: квест → старый общий ключ → ходьба (старые ключи не удаляются). Режим и джойстик хранятся в настройках (`el_sueno_ajustes_v1`).
 
 ## Тесты
 
 | Команда | Что проверяет |
 |---|---|
-| `npm test` / `npm run test:mobile` | `tests/e2e.py` — прохождение квеста: 52 проверки на десктопе, 54 в мобильной эмуляции (~10 мин каждый, таймеры в реальном времени) |
-| `npm run test:walk` | `tests/e2e_walk.py` (прохождение, 67) и `tests/e2e_walk_mobile.py` (джойстик и тач, 14) |
-| `npm run test:saves` | `tests/e2e_saves.py` — сохранения двух версий изолированы, миграция старого сохранения (16) |
-| `npm run test:all` | всё подряд |
+| `npm test` / `npm run test:mobile` | `tests/e2e.py` — прохождение в основном режиме: ходьба, тап и клик по земле, входы в кадры и выходы, обе ветки погони, загадка, переключение режима, сохранение на улице и в кадре, финал (81 проверка на десктопе; мобильный — тач, джойстик как опция, портрет) |
+| `npm run test:lectura` | `tests/e2e_lectura.py` — прохождение в «Modo lectura» (десктоп и мобильный) |
+| `npm run test:saves` | `tests/e2e_saves.py` — формат v2, миграция партий квеста и ходьбы, приоритет, испорченные сохранения, режим × партия |
+| `npm run test:all` | всё подряд (~35 мин) |
 
-Скриншоты — в `tests/screenshots/` (ходьба — в `tests/screenshots/walk/`). Все тесты возвращают код 1 при упавшей проверке или ошибке в консоли.
+Скриншоты — в `tests/screenshots/` (`h_*` — основной режим, `h_m_*` — мобильный, `q_*` — lectura). Все тесты возвращают код 1 при упавшей проверке или ошибке в консоли; в CI упавшие проверки видны как аннотации.
 
 ## Harness Claude Code
 
@@ -58,7 +61,6 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 ## Технический долг
 
-- **Главное:** гибрид в одной сборке — улицы с ходьбой, интерьеры и разговоры в кадрах, режимы «normal» и «lectura» как настройки (см. `docs/ROADMAP.md`).
-- В квест-версии остался код ходьбы (`Player.move`, коллайдеры, `test` у `CAMS`, скрытые `#joy`/`#btnA`/`#btnR`, поля `keys`/`joy`/`runT`). **Не удалять**: при объединении он уйдёт в общий модуль.
+- Персонажи — простые модели из коробок (`shared/characters.js`); следующий шаг — переделать их (параметрические low-poly тела, «эффект сна»).
 - В реальном Safari (macOS/iOS) и на реальных Android-устройствах не проверялось.
 - Уровни A2–B1 ещё не реализованы, это задача следующих глав (II — El Hospital).

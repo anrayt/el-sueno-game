@@ -14,14 +14,15 @@ export class Player {
   }
   place(x, z, ry) { this.pos.set(x, 0, z); if (ry != null) this.ry = ry; this.zone = zoneAt(x, z); this.sync(); }
   sync() { this.g.position.copy(this.pos); this.g.rotation.set(-this.lie * PI / 2, this.ry, 0, 'YXZ'); this.g.position.y = this.lie * 0.2; }
-  /** inp: {x,y,run}; cm: CameraManager. La base de movimiento se congela al cambiar de cámara hasta soltar el control. */
+  /** inp: {x,y,run} relativo a la cámara, o {world:true,wx,wz,run} en coordenadas del mundo (ir a un punto).
+      cm: CameraManager. La base de movimiento se congela al cambiar de cámara hasta soltar el control. */
   update(dt, inp, cm, canMove) {
-    const mag = Math.hypot(inp.x, inp.y);
+    const mag = inp.world ? 1 : Math.hypot(inp.x, inp.y);
     if (mag < 0.12 || !canMove) cm.switched = false;
     if (!cm.switched) { cm.cam.getWorldDirection(this.fwd); this.fwd.y = 0; if (this.fwd.lengthSq() < 1e-4) this.fwd.set(0, 0, -1); this.fwd.normalize(); this.right.set(-this.fwd.z, 0, this.fwd.x); }
     this.moving = canMove && mag > 0.12; this.vel.set(0, 0, 0);
     if (this.moving) {
-      const sp = (inp.run ? 4.4 : 2.1) * Math.min(1, mag); this.vel.copy(this.right).multiplyScalar(inp.x / mag).addScaledVector(this.fwd, inp.y / mag).normalize().multiplyScalar(sp);
+      const sp = (inp.run ? 4.4 : 2.1) * Math.min(1, mag); if (inp.world) this.vel.set(inp.wx, 0, inp.wz).normalize().multiplyScalar(sp); else this.vel.copy(this.right).multiplyScalar(inp.x / mag).addScaledVector(this.fwd, inp.y / mag).normalize().multiplyScalar(sp);
       this.move(this.vel.x * dt, this.vel.z * dt);
       const tr = Math.atan2(this.vel.x, this.vel.z); let da = tr - this.ry; da = Math.atan2(Math.sin(da), Math.cos(da)); this.ry += da * Math.min(1, dt * 11);
       const prev = this.phase; this.phase += dt * sp * 2.5; if (Math.floor(prev / PI) !== Math.floor(this.phase / PI) && this.stepCb) this.stepCb(inp.run);
