@@ -7,7 +7,9 @@
     "build": "node build.js",
     "serve": "npx --yes http-server dist -p 8080 -c-1",
     "test": "node build.js && python3 tests/e2e.py",
-    "test:mobile": "node build.js && python3 tests/e2e.py m"
+    "test:mobile": "node build.js && python3 tests/e2e.py m",
+    "test:all": "node build.js && python3 tests/e2e.py && python3 tests/e2e.py m",
+    "test:setup": "python3 -m pip install -r requirements.txt && python3 -m playwright install chromium"
   },
   "dependencies": {
     "three": "0.149.0"

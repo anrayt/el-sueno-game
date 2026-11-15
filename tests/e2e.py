@@ -1,7 +1,8 @@
 """Сквозное прохождение главы в headless Chromium.
 Запуск: python3 tests/e2e.py      (десктоп, мышь+клавиатура)
         python3 tests/e2e.py m    (мобильная эмуляция, тач)
-Нужно: pip install playwright && python3 -m playwright install chromium
+Нужно: pip install -r requirements.txt && python3 -m playwright install chromium
+Код возврата: 0 — все проверки прошли и нет ошибок в консоли, иначе 1.
 """
 import json, sys
 from playwright.sync_api import sync_playwright
@@ -126,3 +127,4 @@ with sync_playwright() as p:
         pg.set_viewport_size({'width':390,'height':760}); pg.wait_for_timeout(1500); flush(); pg.screenshot(path=os.path.join(SHOTS,'q_m_port.png')); ok('vertical: puntos y salidas dentro de la pantalla', ev("()=>[...document.querySelectorAll('.hs.on, #nav .nv')].every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight})"))
     b.close()
 print('ERRORES:',errs or 'ninguno'); print('TOTAL',sum(res),'/',len(res))
+sys.exit(0 if res and all(res) and not errs else 1)
