@@ -1,0 +1,13 @@
+# Заголовки Cloudflare Pages: https://developers.cloudflare.com/pages/configuration/headers/
+# Игра — один HTML без внешних ресурсов: всё, что не встроено в страницу, запрещено.
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cache-Control: no-cache
+
+# Имя файла не меняется между версиями, поэтому браузер каждый раз сверяет ETag
+# (ответ 304 без тела, если версия та же). Сжатие brotli/gzip Cloudflare делает сам.

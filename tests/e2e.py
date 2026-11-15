@@ -7,7 +7,7 @@
 import json, sys
 from playwright.sync_api import sync_playwright
 import os, pathlib
-URL=(pathlib.Path(__file__).resolve().parent.parent/'dist'/'el-sueno.html').as_uri()
+URL=os.environ.get('E2E_URL') or (pathlib.Path(__file__).resolve().parent.parent/'dist'/'el-sueno.html').as_uri()  # E2E_URL: проверить по http
 CHROME=os.environ.get('CHROME_PATH')  # необязательно: путь к Chrome; иначе Chromium из Playwright
 ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox','--autoplay-policy=no-user-gesture-required']
 MOBILE = len(sys.argv)>1
@@ -46,14 +46,22 @@ with sync_playwright() as p:
         else: pg.keyboard.press(f'Digit{i[0]+1}')
         pg.wait_for_timeout(150)
     def hs(id):
-        flush(); pg.wait_for_timeout(450); flush(); pg.wait_for_timeout(150); assert ev(f"!!document.querySelector('.hs.on[data-id=\"{id}\"]')"), ('hotspot no visible',id,st()['scr'])
+        flush(); pg.wait_for_timeout(450); flush(); pg.wait_for_timeout(150)
+        # el punto se muestra en el siguiente fotograma: con SwiftShader cargado puede tardar
+        try: pg.wait_for_selector(f'.hs.on[data-id="{id}"]',timeout=5000)
+        except Exception: raise AssertionError(('hotspot no visible',id,st()['scr']))
         tap(f'.hs[data-id="{id}"]'); pg.wait_for_timeout(250); return flush()
     def go(label):
-        flush(); assert ev(f"[...document.querySelectorAll('#nav .nv')].some(b=>b.textContent.includes('{label}'))"), (label, ev("document.getElementById('nav').textContent"))
+        flush()
+        try: pg.wait_for_function(f"[...document.querySelectorAll('#nav .nv')].some(b=>b.textContent.includes('{label}'))",timeout=5000)
+        except Exception: raise AssertionError((label, ev("document.getElementById('nav').textContent")))
         tap(f'#nav .nv:has-text("{label}")'); pg.wait_for_timeout(1600); flush(); pg.wait_for_timeout(300); return flush()
     pg.goto(URL); pg.wait_for_timeout(1200)
     ok('carga sin errores, THREE r149', ev('THREE.REVISION')=='149' and ev('!!window.__sueno'))
-    tap('#tNew'); pg.wait_for_timeout(11500); r=flush(); s=st()
+    tap('#tNew'); pg.wait_for_timeout(11500); r=flush()
+    try: pg.wait_for_function("document.querySelectorAll('.hs.on').length==3 && document.querySelectorAll('#nav .nv').length==1",timeout=5000)
+    except Exception: pass
+    s=st()
     ok('intro → primer plano con puntos activos y salidas', r=='idle' and s['scr']=='callejon1' and ev("document.querySelectorAll('.hs.on').length")==3 and ev("document.querySelectorAll('#nav .nv').length")==1, s)
     ok('audio iniciado', ev("__sueno.audio.ready && __sueno.audio.ctx.state")=='running')
     ok('sin controles de movimiento en pantalla', ev("getComputedStyle(document.getElementById('touch')).display")=='none')

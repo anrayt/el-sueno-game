@@ -55,11 +55,18 @@ npm run test:mobile   # сборка + мобильная эмуляция
 npm run test:all      # оба режима
 ```
 
-Каждый прогон занимает несколько минут: таймеры погони и кат-сцены идут в реальном времени. При любой упавшей проверке скрипт завершается с кодом 1. Переменная `CHROME_PATH` позволяет использовать установленный Chrome вместо Chromium из Playwright.
+Каждый прогон занимает несколько минут: таймеры погони и кат-сцены идут в реальном времени. При любой упавшей проверке скрипт завершается с кодом 1. Переменная `CHROME_PATH` позволяет использовать установленный Chrome вместо Chromium из Playwright, `E2E_URL` — проходить игру по http-адресу вместо `file://` (например, чтобы проверить заголовки деплоя).
 
 ## Как задеплоить
 
-Игра — один статический файл, бэкенд не нужен. Варианты и пошаговые инструкции — в [docs/DEPLOY.md](docs/DEPLOY.md).
+Игра публикуется на **Cloudflare Pages** через GitHub Actions: на каждый push в `main` — сборка и e2e в двух режимах, при успехе — деплой. Заголовки безопасности и кеширования — в `deploy/cloudflare/_headers`.
+
+```sh
+npm run site     # dist/ → site/ (index.html + _headers), то, что уходит на Pages
+npm run deploy   # ручной деплой через wrangler (минуя CI, только в крайнем случае)
+```
+
+Первая настройка (проект, токен, секреты GitHub), свой домен и откат — в [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Структура репозитория
 
@@ -75,6 +82,9 @@ npm run test:all      # оба режима
 ├── dist/el-sueno.html собранная игра
 ├── tests/e2e.py       сквозной тест (Playwright)
 ├── docs/              документация (см. ниже)
+├── deploy/cloudflare/ заголовки для Cloudflare Pages
+├── scripts/site.js    подготовка каталога site/ для деплоя
+├── .github/workflows/ CI: сборка, e2e, деплой
 ├── build.js           сборка в один HTML
 ├── requirements.txt   зависимости тестов
 ├── HANDOFF.md         записка предыдущего разработчика
@@ -90,5 +100,5 @@ npm run test:all      # оба режима
 | [LORE.md](docs/LORE.md) | мир, Орден, Проект Vigilia, персонажи; факт / свидетельство / гипотеза |
 | [LANGUAGE_DESIGN.md](docs/LANGUAGE_DESIGN.md) | как испанский встроен в механики, словарь, план A2 → B1 |
 | [CONTENT_GUIDE.md](docs/CONTENT_GUIDE.md) | как добавить сцену, точку, документ, слово, архив, Eco, диалог |
-| [DEPLOY.md](docs/DEPLOY.md) | деплой |
+| [DEPLOY.md](docs/DEPLOY.md) | деплой на Cloudflare Pages, CI, домен, откат |
 | [ROADMAP.md](docs/ROADMAP.md) | техдолг и глава II «El Hospital» |
