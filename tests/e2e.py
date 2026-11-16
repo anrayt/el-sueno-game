@@ -140,7 +140,7 @@ with sync_playwright() as p:
     book(1); ok('cuaderno con 2 documentos', st()['modal']=='book' and ev("document.querySelectorAll('#bookBody [data-d]').length")>=2); close_book()
     # ---- plaza ----
     tp(0,-23.5); pg.wait_for_timeout(600); flush(); s=st(); ok('plaza: primera visita, teléfono suena', s['f'].get('plazaVisitada') and ev('__sueno.ringing()'))
-    tp(0,-47.6); c=xy(0,0,-51); point(*c) if c else ev("()=>__sueno.input.goTo(0,-51)"); until("__sueno.busy || !!__sueno.dlg.resolve"); s=st(); ok('pasaje bloqueado sin luz', s['z']>=-48.95 and (s['dlg'] or s['busy']), s['z']); flush()
+    tp(0,-47.6); flush(); pg.wait_for_timeout(1000); c=xy(0,0,-51); point(*c) if c else ev("()=>__sueno.input.goTo(0,-51)"); until("__sueno.busy || !!__sueno.dlg.resolve"); s=st(); ok('pasaje bloqueado sin luz', s['z']>=-48.95 and (s['dlg'] or s['busy']), s['z']); flush()
     # quiosco: de la calle al plano fijo y vuelta
     act(-5.2,-29.2); s=st(); ok('quiosco: el periódico abre el plano fijo y se lee', s['scr']=='quiosco' and s['cam']=='quiosco' and 'periodico' in s['docs'] and 'ciudad' in s['arch'], s)
     pg.wait_for_timeout(400); ok('plano fijo: puntos activos y solo la salida «Salir»', ev("document.querySelectorAll('.hs.on').length")==1 and ev("[...document.querySelectorAll('#nav .nv')].map(b=>b.textContent)")==['Salir'], ev("[...document.querySelectorAll('#nav .nv')].map(b=>b.textContent)"))
@@ -156,7 +156,9 @@ with sync_playwright() as p:
     # tienda: empujar / tirar (en la calle), cruzar la puerta → plano fijo
     r=act(12.3,-34); pick('Empujar'); flush(); s=st(); ok('puerta «TIRA»: empujar no abre y tiene consecuencia', not s['f'].get('tiendaAbierta') and s['cor']<100 and s['scr'] is None, s['cor'])
     act(12.3,-34); pick('Tirar'); flush(); ok('puerta «TIRA»: tirar abre', st()['f'].get('tiendaAbierta'))
-    tp(10.6,-34); c=xy(13.0,0,-34); point(*c) if c else ev("()=>__sueno.input.goTo(13,-34)")
+    tp(10.6,-34); flush(); pg.wait_for_timeout(1200); flush()   # la cámara termina de girar hacia el protagonista: el punto del suelo se proyecta bien
+    c=xy(13.0,0,-34); point(*c) if c else ev("()=>__sueno.input.goTo(13,-34)"); pg.wait_for_timeout(300)
+    if not st()['dest'] and st()['scr'] is None: ev("()=>__sueno.input.goTo(13,-34)")   # el toque cayó sobre otra cosa
     until("__sueno.scr==='tienda' && !__sueno.going",30000)
     pg.wait_for_timeout(300); flush(); s=st(); ok('tienda: al cruzar la puerta andando se entra en el plano fijo', s['scr']=='tienda' and s['cam']=='tienda' and s['f'].get('v_tienda') and abs(s['ret']['x']-11.7)<0.1, s)
     if MOBILE: ok('en un plano fijo no hay controles de movimiento', ev("document.getElementById('touch').classList.contains('hidden')"))

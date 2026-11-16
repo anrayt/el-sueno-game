@@ -139,7 +139,7 @@ export class UIManager {
   zone(z) { const el = $('zona'); el.innerHTML = `<small>${z.n}</small>${esc(z.name)}`; el.style.opacity = 1; clearTimeout(this.zt); this.zt = setTimeout(() => { el.style.opacity = 0; }, 3200); }
   flash(t) { this.flashTxt = t; this.flashT = performance.now() + 1400; }
   prompt(verb, near) { const el = $('prompt'), now = performance.now(); let html = null;
-    if (this.flashT > now) html = esc(this.flashTxt); else if (verb) html = this.badge && near ? `<b>${document.body.classList.contains('touch') ? '◉' : 'E'}</b>${esc(verb)}` : esc(verb);
+    if (this.flashT > now) html = esc(this.flashTxt); else if (verb) { const b = document.body.classList, tch = b.contains('touch'); html = this.badge && near && (!tch || b.contains('joy')) ? `<b>${tch ? '◉' : 'E'}</b>${esc(verb)}` : esc(verb); }
     if (html !== this._p) { this._p = html; if (html) el.innerHTML = html; el.style.opacity = html ? 1 : 0; } }
   estado(c, threat) { const lab = threat > 0.3 ? 'Pánico' : c > 70 ? 'Tranquilo' : c > 40 ? 'Nervioso' : c > 15 ? 'Miedo' : 'Pánico'; if (lab !== this._e) { this._e = lab; $('estadoTxt').textContent = lab; }
     const p = $('pupila'); p.setAttribute('r', (1.6 + 2.8 * c / 100 - threat).toFixed(2)); p.setAttribute('fill', c < 40 || threat > 0.3 ? '#a8351f' : '#8f8a80'); $('parpado').style.display = 'none'; }

@@ -52,12 +52,14 @@ export class Game {
   start(isNew) {
     this.audio.init(); let st = isNew ? null : this.save.load(); if (isNew) this.save.clear(); if (!st) { st = this.save.fresh(); isNew = true; }
     this.state = st; this.f = st.flags; if (st.pos.z < -85.5) { st.pos.x = 0; st.pos.z = -80; }
+    // partida guardada en mitad de la persecución: se vuelve a la entrada del pasaje (la persecución no se puede saltar)
+    if (!st.scr && !st.flags.chaseDone && st.pos.x < 13 && st.pos.z < -57) st.pos = { x: 0, z: -50.2, ry: Math.PI };
     this.mode = 'play'; if (st.scr) this.setScreen(st.scr); else this.toStreet(st.pos);
     this.applyModo(); this.sync(); this.world.snap(); this.lastZone = this.player.zone;
-    $('title').classList.add('hidden'); $('hud').classList.remove('hidden'); this.syncHud(); this.gfx.u.dark.value = 0;
+    $('title').classList.add('hidden'); $('hud').classList.remove('hidden'); this.syncHud(); this.gfx.u.dark.value = 0; if (isNew) this.saveNow();
     if (isNew) this.run(async g => { g.player.lie = 1; g.player.sync(); await g.ui.fade(true, '', 0); await g.wait(500); await g.ui.fadeText('No recuerdas tu nombre.'); await g.wait(1600); await g.ui.fadeText('Abres los ojos.'); await g.wait(1400);
       await g.ui.fade(false, '', 2600); g.rise = true; await g.wait(2300); await g.think('Hace frío. Hay mucha niebla.', '¿Dónde estoy?'); g.ui.zone(ZONES.callejon); });
-    else { this.ui.fade(true, '', 0).then(() => this.ui.fade(false, '', 1500)); this.ui.zone(ZONES[this.player.zone]); }
+    else { this.going = true; this.ui.fade(true, '', 0).then(() => this.ui.fade(false, '', 1500)).then(() => { this.going = false; }); this.ui.zone(ZONES[this.player.zone]); }
   }
   /* ---- estado ---- */
   set(flag, v = true) { this.f[flag] = v; this.sync(); this.saveSoon(); }
@@ -85,13 +87,13 @@ export class Game {
   async goTo(id) { if (this.going) return; this.going = true; this.steps(); await this.ui.fade(true, '', 330); this.setScreen(id); await this.wait(240); await this.ui.fade(false, '', 480); this.going = false; this.saveSoon(); }
   steps() { const surf = this.surface(); [0, 190, 380, 570].forEach(t => setTimeout(() => this.audio.step(surf, false), t)); }
   /** Modo normal: de la calle a un plano fijo. Se recuerda el punto de la calle para volver. ret: punto de vuelta distinto del actual. */
-  async enterFrame(id, ret) { if (this.scr === id) return; const p = this.player; ret = ret || { x: +p.pos.x.toFixed(2), z: +p.pos.z.toFixed(2), ry: +p.ry.toFixed(2) }; await this.goTo(id); this.state.ret = ret; }
+  async enterFrame(id, ret) { if (this.scr === id) return; const p = this.player; ret = ret || { x: +p.pos.x.toFixed(2), z: +p.pos.z.toFixed(2), ry: +p.ry.toFixed(2) }; this.state.ret = ret; await this.goTo(id); }
   /** Modo normal: «Salir» — del plano fijo a la calle, al punto desde donde se entró. */
   async exitFrame() { if (!this.scr || this.going) return; this.going = true; const s = SCREENS[this.scr], r = this.state.ret || { x: s.out[0], z: s.out[1], ry: s.out[2] }; this.steps();
     await this.ui.fade(true, '', 330); this.toStreet(r); await this.wait(240); await this.ui.fade(false, '', 480); this.going = false; this.saveSoon(); }
   /** Pone la partida de acuerdo con el modo elegido (al empezar, al cargar y al cambiar el ajuste). */
   applyModo() { const p = this.player, s = SCREENS[this.scr];
-    if (this.modo === 'lectura') { if (!this.scr) this.setScreen(screenAt(p.pos.x, p.pos.z)); else if (s.soloNormal) this.setScreen('puerta'); this.state.ret = null; }
+    if (this.modo === 'lectura') { if (!this.scr) { let id = screenAt(p.pos.x, p.pos.z); if (!this.f.chaseDone && (id === 'pasajeB' || id === 'puerta')) id = 'pasajeA'; this.setScreen(id); } else if (s.soloNormal) this.setScreen('puerta'); this.state.ret = null; }
     else if (this.scr) { if (s.mode === 'walk') this.toStreet({ x: s.at[0], z: s.at[1], ry: s.ry }); else if (!this.state.ret) this.state.ret = { x: s.out[0], z: s.out[1], ry: s.out[2] }; }
     this.lastZone = this.player.zone; this.syncHud(); }
   toggleModo() { if (this.mode === 'play' && (this.busy || this.going || this.chase)) { this.ui.toast('Ahora no puedes cambiar el modo.'); return; }
@@ -103,7 +105,7 @@ export class Game {
     $('keysHelp').innerHTML = (this.modo === 'lectura' ? HELP_FRAME : HELP_WALK) + HELP_COMMON; }
   /** Controles en pantalla según la escena: el joystick solo en la calle, en táctil y si está activado. */
   syncHud() { const walk = !this.scr; $('touch').classList.toggle('hidden', !(walk && this.joyOn && this.mode === 'play' && document.body.classList.contains('touch')));
-    document.body.classList.toggle('joy', walk && this.joyOn); if (!walk && this.input) { this.input.stop(); this.input.joy.x = this.input.joy.y = 0; this.inter.clear(); } }
+    document.body.classList.toggle('joy', walk && this.joyOn); if (!walk && this.input) { this.input.release(); this.inter.clear(); } }
   saveNow() { if (this.mode === 'title') return; const p = this.player; this.state.pos = { x: +p.pos.x.toFixed(2), z: +p.pos.z.toFixed(2), ry: +p.ry.toFixed(2) }; this.state.scr = this.scr; this.save.save(this.state); }
   saveSoon() { clearTimeout(this._st); this._st = setTimeout(() => this.saveNow(), 400); }
   saveSettings() { this.save.saveSettings({ vol: this.audio.vol, muted: this.audio.muted, voz: this.audio.voz, modo: this.modo, joy: this.joyOn }); }
@@ -177,7 +179,7 @@ export class Game {
     // el pasaje está oscuro: sin luz no se puede entrar
     if (p.pos.z < -48.9 && p.pos.z > -52 && Math.abs(p.pos.x) < 2.6 && !f.luz) { p.pos.z = -48.9; p.sync(); this.input.stop(); if (this.time > this.blockT && !this.busy) { this.blockT = this.time + 5; this.run(g => g.think('El pasaje está muy oscuro. No veo nada.', 'Necesito luz.')); } }
     if (z === 'pasaje' && f.luz && !f.luzOn) { this.set('luzOn'); this.ui.toast('Linterna: encendida'); }
-    if (!f.chaseDone && !this.chase && !this.busy && z === 'pasaje' && p.pos.z < -57 && p.pos.z > -72) startChase(this);
+    if (!f.chaseDone && !this.chase && !this.busy && !this.going && z === 'pasaje' && p.pos.z < -57 && p.pos.z > -72) startChase(this);
     if (f.puertaAbierta && p.pos.z < -87.5 && !this.busy) { this.ending(); return; }
     // la puerta abierta de la tienda: al cruzarla se entra en el plano de la tienda
     if (f.tiendaAbierta && p.pos.x > 12.7 && Math.abs(p.pos.z + 34) < 1.2 && this.canAct()) this.run(g => g.enterFrame('tienda', { x: 11.7, z: clamp(p.pos.z, -34.6, -33.4), ry: -Math.PI / 2 }));

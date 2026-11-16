@@ -59,6 +59,12 @@ with sync_playwright() as p:
     ev("()=>__sueno.saveNow()"); sv=json.loads(get(K2)); ok('se guarda el plano', sv['scr']=='plaza1' and sv['v']==2, sv.get('scr'))
     ev("([k])=>localStorage.setItem(k,JSON.stringify({modo:'normal'}))",[KS]); pg.goto(URL); pg.wait_for_timeout(1200); cont(); s=g()
     ok('la misma partida en modo normal: en la calle', s['modo']=='normal' and s['scr'] is None and s['inv']==['pilas'], s)
+    # 8. партия, сохранённая посреди погони: погоню нельзя пропустить ни в одном режиме
+    MID=dict(BASE_ST,v=2,scr=None,ret=None,pos={'x':0.0,'z':-65.0,'ry':3.14},inv=['linterna_ok'],flags=dict(BASE_ST['flags'],luz=True,luzOn=True,v_pasaje=True))
+    boot({K2:MID,KS:{'modo':'lectura'}}); cont(); s=g(); ok('guardado en mitad de la persecución + modo lectura: plano anterior a la persecución', s['scr'] in ('boca','pasajeA') and not ev("!!__sueno.f.chaseDone"), s)
+    boot({K2:MID}); cont(); pg.wait_for_timeout(2500); s=g(); ok('lo mismo en modo normal: vuelve a la entrada del pasaje, sin persecución en marcha', s['scr'] is None and s['z']>-52 and not ev("!!__sueno.chase") and not ev("!!__sueno.f.chaseDone"), s)
+    # 9. «Nueva partida» se guarda enseguida: una partida antigua no vuelve si el navegador se cierra durante la intro
+    boot({KQ:QUEST}); pg.click('#tNew'); pg.wait_for_timeout(300); pg.click('#tNew'); pg.wait_for_timeout(800); sv=json.loads(get(K2)); ok('partida nueva: guardada desde el primer momento', sv['v']==2 and sv['inv']==[] and not sv['flags'].get('golpes'), sv)
     b.close()
 print('ERRORES DE CONSOLA:', errs or 'ninguno')
 print(f'TOTAL {sum(res)} / {len(res)}')
