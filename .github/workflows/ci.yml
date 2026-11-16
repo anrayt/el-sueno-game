@@ -120,6 +120,9 @@ jobs:
       - name: сохранения и миграция
         if: ${{ !cancelled() && matrix.suite == 'lectura' }}
         run: python tests/e2e_saves.py
+      - name: персонажи и эффект сна
+        if: ${{ !cancelled() && matrix.suite == 'lectura' }}
+        run: python tests/characters.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -58,6 +58,7 @@
 - Про телефон: «El teléfono miente. No es una persona. Es el hospital. El hospital quiere una cosa: que duermas.»
 - Про «al revés»: «Aquí todo es al revés. Tú duermes; por eso estás despierto aquí.»
 - Про фотографию: «¿Hay siete personas? ¿Y un médico? Entonces yo estoy en la foto. Soy el número tres.»
+- **Намеренное противоречие (визуальное).** Anselmo говорит «Yo no duermo», но выглядит самым «спящим» человеком в городе: «эффект сна» на нём максимальный (1.0, у героя — 0.4). Это подсказка игроку, а не ошибка: либо он лжёт, либо спит глубже всех (ср. гипотезу «он — пациент номер три на фото»). Словами в игре это не объясняется.
 - После открытия двери Anselmo исчезает; на скамейке лежит только повязка. Архив `venda`: «Si ya no lleva la venda, ahora mira. Y si mira...» Граффити меняется на «ÉL YA NO MIRA. AHORA MIRAS TÚ.», газета: «El farolero no está en la plaza.»
 - В Eco магазина радио говорит голосом Anselmo: «Todos duermen. Yo no duermo.»
 
@@ -65,6 +66,7 @@
 
 - «No tiene cara: solo un ojo abierto. Es alto y muy delgado.» (архив `mira`). Силуэт мелькает в тумане у входа в пассаж: «Hay alguien allí, en la niebla. Es muy alto. No se mueve… Ya no está.»
 - Граффити в переулке: «NO MIRES ATRÁS». Надпись в пассаже: «ÉL TE MIRA / SI TÚ LO MIRAS».
+- Визуально он подчиняется своему правилу «Él te mira si tú lo miras»: издалека и краем глаза он размыт, как всё во сне, а вблизи и в центре взгляда — резкий. Чем пристальнее смотришь, тем он реальнее.
 - В погоне он идёт следом, подражает голосу Anselmo («Espera. Soy yo, Anselmo. Mira aquí.») и смеётся, если откликнуться: «La voz ríe. No es Anselmo.» Касается шеи и спины. Если оглянуться — ловит.
 - Архив `mira` (hipótesis): «Vive detrás. No tiene cara: solo un ojo abierto. Es alto y muy delgado. La pared dice: «Él te mira si tú lo miras». Anselmo dice lo mismo. Si nadie lo mira, quizá no existe. Quizá lo hacemos nosotros, cuando miramos atrás.»
 - После побега, если оглядывался: «Antes lo miré. Y él me miró.»; если нет: «No miré atrás. No sé qué era.»

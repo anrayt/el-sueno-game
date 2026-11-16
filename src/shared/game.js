@@ -9,6 +9,7 @@ import { SCREENS, frameOf, screenAt } from './scenes.js';
 import { HotspotSystem } from '../modes/frame/hotspots.js';
 import { chaseSeq } from '../modes/frame/chase.js';
 import { InteractionSystem } from '../modes/walk/interaction.js';
+import { dreamUpdate } from './characters.js';
 import { WalkInput } from '../modes/walk/input.js';
 import { startChase, endChase, updateChase } from '../modes/walk/chase.js';
 
@@ -29,15 +30,16 @@ export let game = null;
 export class Game {
   constructor() {
     this.save = new SaveManager({ key: SAVE_KEYS.hybrid, from: [SAVE_KEYS.quest, LEGACY_SAVE_KEY, SAVE_KEYS.walk], validScr: id => !!SCREENS[id] }); this.audio = new AudioManager();
-    const s = this.save.settings(); this.audio.vol = s.vol; this.audio.muted = !!s.muted; this.audio.voz = s.voz !== false; this.modo = s.modo === 'lectura' ? 'lectura' : 'normal'; this.joyOn = !!s.joy;
+    const s = this.save.settings(); this.audio.vol = s.vol; this.audio.muted = !!s.muted; this.audio.voz = s.voz !== false; this.modo = s.modo === 'lectura' ? 'lectura' : 'normal'; this.joyOn = !!s.joy; this.sueno = s.sueno !== false;
     this.state = this.save.fresh(); this.f = this.state.flags; this.mode = 'title'; this.busy = false; this.chase = null; this.time = 0;
     this.dread = 0; this.hold = 0; this.going = false; this.scr = null; this.lastZone = null; this.blockT = 0; this.autoT = 0; this.rise = false; this.pendingFaint = false;
   }
   boot() {
     game = this;
     this.lang = new LanguageSystem(this); this.inv = new Inventory(this); this.lore = new LoreArchive(this); this.ui = new UIManager(this, { badge: true }); this.dlg = new DialogueSystem(this); this.puzzle = new PuzzleSystem(this);
-    this.gfx = new Gfx($('c')); this.world = new SceneManager(this); this.world.build(); this.player = new Player(this.world); this.cams = new CameraManager();
+    this.gfx = new Gfx($('c')); this.gfx.dream = this.sueno; this.world = new SceneManager(this); this.world.build(); this.player = new Player(this.world); this.cams = new CameraManager();
     this.hs = new HotspotSystem(this); this.inter = new InteractionSystem(this); this.input = new WalkInput(this);
+    this.gfx.chars = [this.player.g, this.world.d.anselmo, this.world.d.watcher, this.world.d.sombra];   // para el efecto de sueño
     this.player.stepCb = run => this.audio.step(this.surface(), run);
     this.world.sync(this.f); this.world.snap(); this.cams.resize(this.gfx.resize()); this.bindInput(); this.ui.syncSound(); this.syncOptions();
     const has = !!this.save.load(); $('tCont').classList.toggle('hidden', !has);
@@ -99,16 +101,18 @@ export class Game {
   toggleModo() { if (this.mode === 'play' && (this.busy || this.going || this.chase)) { this.ui.toast('Ahora no puedes cambiar el modo.'); return; }
     this.modo = this.modo === 'lectura' ? 'normal' : 'lectura'; this.saveSettings(); this.syncOptions(); if (this.mode === 'play') { this.applyModo(); this.saveNow(); }
     this.ui.toast(this.modo === 'lectura' ? 'Modo lectura: no caminas. Miras, lees y eliges.' : 'Modo normal: caminas por las calles.'); }
+  /** Efecto de sueño en los personajes (ajuste; por defecto sí). */
+  setSueno(on) { this.sueno = !!on; this.gfx.dream = this.sueno; this.saveSettings(); this.syncOptions(); }
   toggleJoy() { this.joyOn = !this.joyOn; this.saveSettings(); this.syncOptions(); this.syncHud(); }
   /** Textos de los ajustes (pausa y título). */
-  syncOptions() { const m = this.modo === 'lectura' ? 'Modo: lectura' : 'Modo: normal'; $('modoB').textContent = m; $('tModo').textContent = m; $('joyB').textContent = this.joyOn ? 'Mando en pantalla: sí' : 'Mando en pantalla: no';
+  syncOptions() { const m = this.modo === 'lectura' ? 'Modo: lectura' : 'Modo: normal'; $('modoB').textContent = m; $('tModo').textContent = m; $('joyB').textContent = this.joyOn ? 'Mando en pantalla: sí' : 'Mando en pantalla: no'; $('suenoB').textContent = this.sueno ? 'Efecto de sueño: sí' : 'Efecto de sueño: no';
     $('keysHelp').innerHTML = (this.modo === 'lectura' ? HELP_FRAME : HELP_WALK) + HELP_COMMON; }
   /** Controles en pantalla según la escena: el joystick solo en la calle, en táctil y si está activado. */
   syncHud() { const walk = !this.scr; $('touch').classList.toggle('hidden', !(walk && this.joyOn && this.mode === 'play' && document.body.classList.contains('touch')));
     document.body.classList.toggle('joy', walk && this.joyOn); if (!walk && this.input) { this.input.release(); this.inter.clear(); } }
   saveNow() { if (this.mode === 'title') return; const p = this.player; this.state.pos = { x: +p.pos.x.toFixed(2), z: +p.pos.z.toFixed(2), ry: +p.ry.toFixed(2) }; this.state.scr = this.scr; this.save.save(this.state); }
   saveSoon() { clearTimeout(this._st); this._st = setTimeout(() => this.saveNow(), 400); }
-  saveSettings() { this.save.saveSettings({ vol: this.audio.vol, muted: this.audio.muted, voz: this.audio.voz, modo: this.modo, joy: this.joyOn }); }
+  saveSettings() { this.save.saveSettings({ vol: this.audio.vol, muted: this.audio.muted, voz: this.audio.voz, modo: this.modo, joy: this.joyOn, sueno: this.sueno }); }
   setMuted(m) { this.audio.setMuted(m); this.saveSettings(); this.ui.toast(m ? 'Sonido: no' : 'Sonido: sí'); }
   /* ---- ayudas para los guiones ---- */
   wait(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -167,7 +171,7 @@ export class Game {
     this.audio.update(dt, { zone: z, threat, hum, radio: z === 'tienda' ? clamp(1 - D(17.9, -37) / 11, 0.12, 1) : 0, ring: this.ringing() && this.mode === 'play' ? (z === 'tienda' ? 0.25 : clamp(1 - D(8.5, -43.5) / 45, 0.12, 1)) : 0, red: !!f.puertaAbierta });
     const u = this.gfx.u; u.fear.value += (Math.max(threat, (1 - this.state.cordura / 100) * 0.45) - u.fear.value) * Math.min(1, dt * 3); u.red.value = this.world.d.hospV || 0;
     const tv = (this.dlg.active || this.ui.modal || this.mode !== 'play') ? 'hidden' : 'visible'; if (tv !== this._tv) { this._tv = tv; $('touch').style.visibility = tv; }
-    this.ui.estado(this.state.cordura, threat); this.gfx.render(this.world.scene, this.cams.cam, this.time);
+    this.ui.estado(this.state.cordura, threat); dreamUpdate(this.world.d, this.cams.cam); this.gfx.render(this.world.scene, this.cams.cam, this.time);
   }
   /** Sucesos al llegar a una zona por primera vez y disparadores ligados a la posición (solo en la calle). */
   events() { const p = this.player, f = this.f, z = p.zone;

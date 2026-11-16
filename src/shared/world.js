@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { clamp, PI, rng } from './util.js';
 import { DOCS, SYMBOLS } from './data.js';
 import { canvasTex, TEX, buildTextures, textTex, paintText, scaleBoxUV, paintTextRaw } from './textures.js';
-import { makeWatcher, makeAnselmo } from './characters.js';
+import { makeWatcher, makeAnselmo, CHAR_LAYER } from './characters.js';
 /* =====================================================================
    MUNDO: geometría de las zonas, luces, objetos interactivos, cámaras fijas,
    postproceso. Texturas en textures.js, personajes en characters.js, jugador en player.js.
@@ -235,6 +235,8 @@ export class SceneManager {
     /* niebla volumétrica: velos que derivan alrededor del jugador */
     for (let i = 0; i < 16; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.fog, color: 0x8a8f90, transparent: true, opacity: 0.05 + Math.random() * 0.05, depthWrite: false })); const s = 5 + Math.random() * 7; sp.scale.set(s, s * 0.6, 1); sp.userData = { ox: (Math.random() - 0.5) * 26, oz: (Math.random() - 0.5) * 26, y: 0.6 + Math.random() * 3, sp: 0.1 + Math.random() * 0.25, ph: Math.random() * 6 }; S.add(sp); this.motes.push(sp); }
     this.paintGraffiti('NO MIRES ATRÁS');
+    // las luces iluminan también la capa de los personajes (Gfx los dibuja en otra pasada)
+    S.traverse(o => { if (o.isLight) o.layers.enableAll(); });
   }
   matc(c) { this._mc = this._mc || {}; return this._mc[c] || (this._mc[c] = this.mat(null, c)); }
   paintGraffiti(txt) { if (this.d.grafTxt === txt) return; this.d.grafTxt = txt; const c = this.d.grafCanvas; paintText(c.getContext('2d'), c.width, c.height, txt.split('\n'), { size: txt.length > 16 ? 58 : 76, rough: true, seed: txt.length * 3 }); this.d.grafTex.needsUpdate = true; }
@@ -314,29 +316,110 @@ export class CameraManager {
 /* =====================================================================
    Gfx — render a baja resolución + pasada de postproceso (grano, viñeta,
    aberración cromática, etalonaje). Escrito a mano: sin dependencias.
+   Efecto de sueño (this.dream): los personajes (capa 1) se dibujan aparte,
+   a media resolución; el escenario (capa 0) solo aporta la profundidad para
+   taparlos. Una pasada de composición los pinta encima con filtro de Kuwahara,
+   halo suave, contorno que se deshace con ruido y un eco que se queda atrás
+   al moverse; todo crece con el miedo. La fuerza de cada personaje viene en el
+   alfa de su capa (characters.js: uDream).
    ===================================================================== */
+const QUAD_VS = 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }';
+const NOISE = 'float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); } float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y); }';
+/* eco: guarda lo que ya se vio del personaje y lo apaga poco a poco */
+const ECHO_FS = `precision highp float; uniform sampler2D tC,tCD,tSD,tP; uniform float decay; varying vec2 vUv;
+  void main(){ vec4 p=texture2D(tP,vUv); p.a*=decay; float cd=texture2D(tCD,vUv).r, cov=step(cd,.99999), vis=step(cd,texture2D(tSD,vUv).r+.00002);
+    vec4 c=texture2D(tC,vUv); float a=cov*vis*c.a*.6; gl_FragColor = a>p.a ? vec4(c.rgb,a) : p; }`;
+/* composición: escenario + personajes «de sueño» */
+const COMP_FS = `precision highp float; uniform sampler2D tS,tSD,tC,tCD,tE; uniform vec2 cres; uniform float time,fear; varying vec2 vUv; ${NOISE}
+  void main(){
+    vec3 sc=texture2D(tS,vUv).rgb; float sd=texture2D(tSD,vUv).r; vec2 px=1./cres; vec4 e=texture2D(tE,vUv);
+    float cd=texture2D(tCD,vUv).r, cov=step(cd,.99999); vec4 cc=texture2D(tC,vUv);
+    // alrededor: cobertura difuminada (halo, contorno), color medio, fuerza y la profundidad más cercana
+    float cb=0., md=1., sa=0.; vec3 ca=vec3(0.);
+    for(int i=0;i<8;i++){ float a=float(i)*.7854+.3, rr=i<4 ? 2.2 : 5.; vec2 o=vec2(cos(a),sin(a))*rr*px; float d=texture2D(tCD,vUv+o).r, c=step(d,.99999); vec4 q=texture2D(tC,vUv+o);
+      cb+=c; md=min(md,mix(1.,d,c)); ca+=q.rgb*c; sa+=q.a*c; }
+    if(cov+cb<.5){ gl_FragColor=vec4(mix(sc,e.rgb,e.a),1.); return; }
+    float n=cb; cb/=8.; ca/=max(n,1.);
+    float s=cov>.5 ? cc.a : sa/max(n,1.); s=clamp(s*(1.+fear*.9),0.,1.);
+    vec3 col=cc.rgb;
+    if(cov>.5 && s>.02){ // Kuwahara: de cuatro cuadrantes (2×2 muestras espaciadas) se queda con el más uniforme → pinceladas planas
+      vec3 m0=vec3(0.),m1=vec3(0.),m2=vec3(0.),m3=vec3(0.),s0=vec3(0.),s1=vec3(0.),s2=vec3(0.),s3=vec3(0.); float st=1.3*(1.+s);
+      for(int j=0;j<2;j++) for(int i=0;i<2;i++){ vec2 o=(vec2(float(i),float(j))+.5)*st*px;
+        vec3 a=texture2D(tC,vUv+vec2(-o.x,-o.y)).rgb, b=texture2D(tC,vUv+vec2(o.x,-o.y)).rgb, c=texture2D(tC,vUv+vec2(-o.x,o.y)).rgb, d=texture2D(tC,vUv+o).rgb;
+        m0+=a; s0+=a*a; m1+=b; s1+=b*b; m2+=c; s2+=c*c; m3+=d; s3+=d*d; }
+      m0*=.25; m1*=.25; m2*=.25; m3*=.25; float v0=dot(s0*.25-m0*m0,vec3(1.)), v1=dot(s1*.25-m1*m1,vec3(1.)), v2=dot(s2*.25-m2*m2,vec3(1.)), v3=dot(s3*.25-m3*m3,vec3(1.));
+      vec3 k=m0; float v=v0; if(v1<v){v=v1;k=m1;} if(v2<v){v=v2;k=m2;} if(v3<v){k=m3;}
+      col=mix(cc.rgb,k,s); col=mix(col,ca,.3*s*cb); }
+    else if(cov<.5) col=ca;
+    // el contorno se deshace con ruido que se mueve
+    float nz=vn(vUv*cres*.28+vec2(time*1.3,-time*.9));
+    float a=mix(cov, smoothstep(.12+.62*nz, .5+.45*nz, cb+cov*.3), s);
+    // bruma del sueño: menos saturado, un poco más claro y cálido
+    float l=dot(col,vec3(.3,.59,.11)); col=mix(col, vec3(l)*vec3(1.08,1.,.9)+.035, .3*s);
+    float vis=step(cov>.5 ? cd : md, sd+.00002);
+    vec3 halo=(ca*.9+vec3(.82,.79,.72)*.12)*cb*(1.-a)*s;
+    vec3 o=mix(sc,col,a*vis)+halo*vis;
+    gl_FragColor=vec4(mix(o,e.rgb,e.a*(1.-a*vis)),1.); }`;
 export class Gfx {
   constructor(canvas) {
     this.r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false }); this.r.setPixelRatio(1); this.r.autoClear = true;
-    this.u = { tD: { value: null }, time: { value: 0 }, fear: { value: 0 }, dark: { value: 1 }, red: { value: 0 }, res: { value: new THREE.Vector2(640, 480) } };
-    this.ps = new THREE.Scene(); this.pc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    this.ps.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: this.u, depthTest: false, depthWrite: false,
-      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.,1.); }',
-      fragmentShader: `precision highp float; uniform sampler2D tD; uniform float time,fear,dark,red; uniform vec2 res; varying vec2 vUv;
+    this.dream = true; this.ei = 0;
+    this.u = { tD: { value: null }, tM: { value: null }, box: { value: new THREE.Vector4(2, 2, -1, -1) }, time: { value: 0 }, fear: { value: 0 }, dark: { value: 1 }, red: { value: 0 }, res: { value: new THREE.Vector2(640, 480) } };
+    this.chars = []; this.boxes = []; this._s = new THREE.Sphere(); this._v = new THREE.Vector3();
+    this.cu = { tS: { value: null }, tSD: { value: null }, tC: { value: null }, tCD: { value: null }, tE: { value: null }, cres: { value: new THREE.Vector2(320, 240) }, time: this.u.time, fear: this.u.fear };
+    this.eu = { tC: this.cu.tC, tCD: this.cu.tCD, tSD: this.cu.tSD, tP: { value: null }, decay: { value: 0.9 } };
+    this.ps = new THREE.Scene(); this.pc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); this.ps.add(this.quad);
+    const sm = (u, fs) => new THREE.ShaderMaterial({ uniforms: u, depthTest: false, depthWrite: false, vertexShader: QUAD_VS, fragmentShader: fs });
+    this.compM = sm(this.cu, COMP_FS); this.echoM = sm(this.eu, ECHO_FS);
+    this.postM = sm(this.u, `precision highp float; uniform sampler2D tD,tM; uniform vec4 box; uniform float time,fear,dark,red; uniform vec2 res; varying vec2 vUv;
         float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
+        vec3 S(vec2 p){ return (p.x>box.x && p.y>box.y && p.x<box.z && p.y<box.w) ? texture2D(tM,p).rgb : texture2D(tD,p).rgb; }   // con personajes: la composición
         void main(){ vec2 uv=vUv; vec2 d=uv-.5; float r2=dot(d,d);
           uv.x += sin(time*11.+uv.y*38.)*.0035*fear;
           float ca=(.0014+.007*fear)*(.35+r2*4.5);
-          vec3 c=vec3(texture2D(tD,uv+d*ca).r, texture2D(tD,uv).g, texture2D(tD,uv-d*ca).b);
+          vec3 c=vec3(S(uv+d*ca).r, S(uv).g, S(uv-d*ca).b);
           float l=dot(c,vec3(.3,.59,.11)); c=mix(vec3(l),c,.8); c*=vec3(1.05,1.,.93);
           c=mix(c,vec3(l*1.5,l*.62,l*.5),clamp(red*.5+fear*.22,0.,.8));
           c=pow(max(c,0.),vec3(.82))*1.22;
           c+=(h(uv*res+fract(time)*71.3)-.5)*(.065+.06*fear);
           c*=mix(1.,.3,smoothstep(.08,.55,r2)); c*=.97+.03*sin(uv.y*res.y*3.14159);
-          gl_FragColor=vec4(c*(1.-dark),1.); }` })));
+          gl_FragColor=vec4(c*(1.-dark),1.); }`);
     this.resize();
   }
   resize() { const w = window.innerWidth, h = window.innerHeight; this.r.setSize(w, h, false); const lh = Math.min(Math.round(h * Math.min(window.devicePixelRatio || 1, 2)), 540), lw = Math.max(2, Math.round(lh * w / h));
-    if (this.rt) this.rt.dispose(); this.rt = new THREE.WebGLRenderTarget(lw, lh, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true }); this.u.tD.value = this.rt.texture; this.u.res.value.set(lw, lh); return w / h; }
-  render(scene, cam, time) { this.u.time.value = time; this.r.setRenderTarget(this.rt); this.r.render(scene, cam); this.r.setRenderTarget(null); this.r.render(this.ps, this.pc); }
+    [this.rt, this.rtM, this.rtC, ...(this.rtE || [])].forEach(t => t && t.dispose());
+    const lin = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }, depth = (w, h) => { const d = new THREE.DepthTexture(w, h); d.type = THREE.UnsignedIntType; return d; };
+    const cw = Math.max(2, lw >> 1), ch = Math.max(2, lh >> 1);   // personajes a media resolución
+    this.rt = new THREE.WebGLRenderTarget(lw, lh, Object.assign({ depthBuffer: true, depthTexture: depth(lw, lh) }, lin));
+    this.rtM = new THREE.WebGLRenderTarget(lw, lh, Object.assign({ depthBuffer: false }, lin));
+    this.rtC = new THREE.WebGLRenderTarget(cw, ch, Object.assign({ depthBuffer: true, depthTexture: depth(cw, ch) }, lin));
+    this.rtE = [0, 1].map(() => new THREE.WebGLRenderTarget(cw, ch, Object.assign({ depthBuffer: false }, lin)));
+    [this.rtE[0], this.rtE[1]].forEach(t => { this.r.setRenderTarget(t); this.r.setClearColor(0, 0); this.r.clear(); }); this.r.setRenderTarget(null); this.r.setClearColor(0, 1);
+    this.cu.tS.value = this.rt.texture; this.cu.tSD.value = this.rt.depthTexture; this.cu.tC.value = this.rtC.texture; this.cu.tCD.value = this.rtC.depthTexture; this.cu.cres.value.set(cw, ch);
+    this.u.res.value.set(lw, lh); return w / h; }
+  pass(m, target) { this.quad.material = m; this.r.setRenderTarget(target); this.r.render(this.ps, this.pc); }
+  /** Rectángulo (en uv) que ocupan en pantalla los personajes visibles, con margen para el halo; null si no se ve ninguno. */
+  charBox(cam) { const s = this._s, v = this._v, W = this.u.res.value.x, Hh = this.u.res.value.y, t = Math.tan(cam.fov * Math.PI / 360); let x0 = 2, y0 = 2, x1 = -1, y1 = -1;
+    for (const g of this.chars) { let o = g, vis = true; while (o) { if (!o.visible) { vis = false; break; } o = o.parent; } if (!vis) continue;
+      if (!g.userData.bs) { g.userData.bs = new THREE.Box3().setFromObject(g).getBoundingSphere(new THREE.Sphere()); g.userData.bs.applyMatrix4(g.matrixWorld.clone().invert()); }
+      s.copy(g.userData.bs).applyMatrix4(g.matrixWorld); v.copy(s.center).applyMatrix4(cam.matrixWorldInverse); const dz = -v.z;
+      if (dz < s.radius) { if (dz > -s.radius) return [0, 0, 1, 1]; continue; }   // la cámara está casi dentro: toda la pantalla
+      v.applyMatrix4(cam.projectionMatrix); const ry = s.radius / (dz * t) * 0.5 + 14 / Hh, rx = ry * Hh / W, cx = v.x * 0.5 + 0.5, cy = v.y * 0.5 + 0.5;
+      if (cx + rx < 0 || cx - rx > 1 || cy + ry < 0 || cy - ry > 1) continue;
+      x0 = Math.min(x0, cx - rx); y0 = Math.min(y0, cy - ry); x1 = Math.max(x1, cx + rx); y1 = Math.max(y1, cy + ry); }
+    return x1 < x0 ? null : [Math.max(0, x0), Math.max(0, y0), Math.min(1, x1), Math.min(1, y1)]; }
+  render(scene, cam, time) { const dt = clamp(time - (this._t == null ? time : this._t), 0, 0.1); this._t = time; this.u.time.value = time; const r = this.r;
+    this.u.tD.value = this.rt.texture; this.u.box.value.set(2, 2, -1, -1);
+    if (!this.dream) { cam.layers.enableAll(); r.setRenderTarget(this.rt); r.render(scene, cam); cam.layers.set(0); this.boxes.length = 0; this.pass(this.postM, null); return; }
+    cam.layers.set(0); r.setRenderTarget(this.rt); r.render(scene, cam);                                   // escenario (+ su profundidad)
+    const bg = scene.background; scene.background = null; cam.layers.set(CHAR_LAYER); r.setClearColor(0, 0);
+    r.setRenderTarget(this.rtC); r.clear(); r.render(scene, cam); scene.background = bg; cam.layers.set(0); r.setClearColor(0, 1);   // personajes
+    const a = this.rtE[this.ei], b = this.rtE[1 - this.ei]; this.ei = 1 - this.ei; this.eu.tP.value = a.texture; this.eu.decay.value = Math.pow(0.06, dt); this.pass(this.echoM, b);
+    // la composición solo donde hay personajes ahora o los hubo hace un momento (el eco tarda ~1 s en apagarse)
+    cam.updateMatrixWorld(); const bx = this.charBox(cam), now = time; if (bx) this.boxes.push([now, bx]); while (this.boxes.length && now - this.boxes[0][0] > 1.2) this.boxes.shift();
+    if (this.boxes.length) { let x0 = 1, y0 = 1, x1 = 0, y1 = 0; for (const [, q] of this.boxes) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[2]); y1 = Math.max(y1, q[3]); }
+      const W = this.u.res.value.x, Hh = this.u.res.value.y, px = Math.floor(x0 * W), py = Math.floor(y0 * Hh), pw = Math.ceil(x1 * W) - px, ph = Math.ceil(y1 * Hh) - py;
+      this.cu.tE.value = b.texture; this.rtM.scissor.set(px, py, pw, ph); this.rtM.scissorTest = true; this.pass(this.compM, this.rtM);   // en three el recorte va en el propio render target
+      this.u.tM.value = this.rtM.texture; this.u.box.value.set((px + 0.5) / W, (py + 0.5) / Hh, (px + pw - 0.5) / W, (py + ph - 0.5) / Hh); }
+    this.pass(this.postM, null); }
 }

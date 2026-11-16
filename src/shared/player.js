@@ -9,7 +9,7 @@ export class Player {
     this.fwd = new THREE.Vector3(0, 0, -1); this.right = new THREE.Vector3(1, 0, 0); this.vel = new THREE.Vector3(); this.stepCb = null;
     buildHero(this, world); const g = this.g;
     // linterna: foco sujeto a la mano
-    this.spot = new THREE.SpotLight(0xe8d090, 0, 17, 0.5, 0.6, 1.2); this.spot.position.set(0.25, 1.1, 0.2); this.spot.target.position.set(0.1, 0.6, 7); g.add(this.spot, this.spot.target);
+    this.spot = new THREE.SpotLight(0xe8d090, 0, 17, 0.5, 0.6, 1.2); this.spot.position.set(0.25, 1.1, 0.2); this.spot.target.position.set(0.1, 0.6, 7); g.add(this.spot, this.spot.target); this.spot.layers.enableAll();
     world.scene.add(g);
   }
   place(x, z, ry) { this.pos.set(x, 0, z); if (ry != null) this.ry = ry; this.zone = zoneAt(x, z); this.sync(); }

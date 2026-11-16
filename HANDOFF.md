@@ -35,7 +35,7 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 | `shared/scripts.js` | `SCRIPTS` — сюжет: по async-функции на каждый интерактивный объект |
 | `shared/data.js` | Контент: `ZONES`, `ITEMS`, `DOCS`, `LEX` (76 слов), `ARCHIVE`, `ECOS`, символы и решение загадки; ключи сохранений |
 | `shared/world.js`, `player.js` | `SceneManager` (5 зон, `addInter`, `sync`), `CAMS`/`CameraManager`, `Gfx`; `Player` (движение, коллизии, фонарь) |
-| `shared/characters.js`, `textures.js` | Модели героя, Anselmo и El Que Mira; процедурные текстуры |
+| `shared/characters.js`, `textures.js` | Параметрические low-poly персонажи (`makeBody(spec)`: протагонист, Anselmo, El Que Mira), сила «эффекта сна»; процедурные текстуры |
 | `shared/systems.js`, `audio.js` | `SaveManager`, `LanguageSystem`, `Inventory`, `LoreArchive`, `DialogueSystem`, `PuzzleSystem`, `UIManager`; `AudioManager` |
 | `modes/walk/` | улица: `WalkInput` (клавиши, джойстик, ходьба к точке), `InteractionSystem`, погоня в реальном времени |
 | `modes/frame/` | кадр: `HotspotSystem` (точки и выходы), `chaseSeq` (погоня через выборы) |
@@ -44,6 +44,8 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 **Сохранения.** Одна партия, формат `v: 2`, ключ `el_sueno_cap1_v2`. Партии v1 наследуются при первом запуске: квест → старый общий ключ → ходьба (старые ключи не удаляются). Режим и джойстик хранятся в настройках (`el_sueno_ajustes_v1`).
 
+**Персонажи и «эффект сна».** Люди собраны из параметрических low-poly тел (`makeBody`). `Gfx` рисует их отдельным проходом в половинном разрешении и накладывает поверх сцены: фильтр Кувахары, ореол, контур, растворяющийся по шуму, эхо при движении; эффект усиливается со страхом. Сила: Anselmo 1.0, протагонист 0.4; El Que Mira тем резче, чем ближе и чем ближе к центру экрана. В паузе есть «Efecto de sueño: sí/no». Подробно — `docs/ARCHITECTURE.md`, раздел «Персонажи и эффект сна».
+
 ## Тесты
 
 | Команда | Что проверяет |
@@ -51,6 +53,8 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 | `npm test` / `npm run test:mobile` | `tests/e2e.py` — прохождение в основном режиме: ходьба, тап и клик по земле, входы в кадры и выходы, обе ветки погони, загадка, переключение режима, сохранение на улице и в кадре, финал (81 проверка на десктопе; мобильный — тач, джойстик как опция, портрет) |
 | `npm run test:lectura` | `tests/e2e_lectura.py` — прохождение в «Modo lectura» (десктоп и мобильный) |
 | `npm run test:saves` | `tests/e2e_saves.py` — формат v2, миграция партий квеста и ходьбы, приоритет, испорченные сохранения, режим × партия |
+| `npm run test:characters` | `tests/characters.py` — скриншоты персонажей (спереди, сбоку, сзади, лица, в сценах) в `tests/screenshots/characters/`, слой и сила эффекта, правило El Que Mira, настройка «Efecto de sueño» |
+| `npm run perf` | `tests/perf.py` — FPS в четырёх сценах с эффектом и без (справочно, не тест) |
 | `npm run test:all` | всё подряд (~35 мин) |
 
 Скриншоты — в `tests/screenshots/` (`h_*` — основной режим, `h_m_*` — мобильный, `q_*` — lectura). Все тесты возвращают код 1 при упавшей проверке или ошибке в консоли; в CI упавшие проверки видны как аннотации.
@@ -61,6 +65,5 @@ EL SUEÑO, глава I «La Ciudad Vacía» — браузерный психо
 
 ## Технический долг
 
-- Персонажи — простые модели из коробок (`shared/characters.js`); следующий шаг — переделать их (параметрические low-poly тела, «эффект сна»).
 - В реальном Safari (macOS/iOS) и на реальных Android-устройствах не проверялось.
 - Уровни A2–B1 ещё не реализованы, это задача следующих глав (II — El Hospital).

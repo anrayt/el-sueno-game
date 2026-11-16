@@ -123,7 +123,7 @@ export class UIManager {
     $('doc').addEventListener('click', e => { if (!e.target.closest('.w') && !this.guarded()) this.closeDoc(); });
     $('pause').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (!b) return; const a = b.dataset.p; g.audio.ui();
       if (a === 'resume') g.togglePause(); else if (a === 'save') { g.saveNow(); this.toast('Partida guardada'); g.togglePause(); } else if (a === 'book') { this.modal = null; $('pause').classList.add('hidden'); this.openBook(1); }
-      else if (a === 'mute') { g.setMuted(!g.audio.muted); this.syncSound(); } else if (a === 'voz') { g.audio.voz = !g.audio.voz; g.saveSettings(); this.syncSound(); } else if (a === 'modo') g.toggleModo(); else if (a === 'joy') g.toggleJoy(); else if (a === 'title') { g.saveNow(); location.reload(); } });
+      else if (a === 'mute') { g.setMuted(!g.audio.muted); this.syncSound(); } else if (a === 'voz') { g.audio.voz = !g.audio.voz; g.saveSettings(); this.syncSound(); } else if (a === 'modo') g.toggleModo(); else if (a === 'joy') g.toggleJoy(); else if (a === 'sueno') g.setSueno(!g.sueno); else if (a === 'title') { g.saveNow(); location.reload(); } });
     $('volR').addEventListener('input', e => { g.audio.setVolume(e.target.value / 100); g.saveSettings(); });
     // consulta de palabras: toque o clic sobre una palabra subrayada
     document.addEventListener('click', e => { const w = e.target.closest && e.target.closest('.w'); const tip = $('tip'); if (!w) { tip.classList.add('hidden'); return; }

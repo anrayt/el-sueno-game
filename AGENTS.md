@@ -8,6 +8,8 @@
 - `npm test` / `npm run test:mobile` — сквозное прохождение в основном режиме, десктоп / мобильный (`tests/e2e.py`, ~6 мин каждый)
 - `npm run test:lectura` — сквозное прохождение в «Modo lectura», десктоп и мобильный (`tests/e2e_lectura.py`, ~10 мин каждый)
 - `npm run test:saves` — формат сохранения v2 и миграция старых партий
+- `npm run test:characters` — персонажи и эффект сна: скриншоты в `tests/screenshots/characters/`, проверки
+- `npm run perf` — замер FPS с эффектом сна и без (справочно)
 - `npm run test:all` — всё вышеперечисленное подряд (~35 мин)
 - `npm run test:setup` — поставить Playwright и Chromium для тестов
 - `npm run build:site` — собрать `site/` для Cloudflare Pages (`index.html`, `_headers`, `_redirects`, `404.html`)

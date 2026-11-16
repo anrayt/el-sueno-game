@@ -175,6 +175,23 @@ if (k < 0) { await g.think('No hago nada. Y eso también es una respuesta.'); re
 - значимые выборы фиксируйте через `g.decide('…')` — журнал решений пригодится в следующих главах;
 - последствия ошибок — через `addCordura`, `dread`, `camShake`, звук, а не через конец игры.
 
+## Добавить персонажа
+
+Модель — спека для `makeBody(spec)` в `src/shared/characters.js` (см. `HERO`, `ANSELMO`, `WATCHER`):
+
+```js
+const ENFERMERA = { height: 1.66, build: 0.92, dream: 0.8, seed: 41, skin: '#8f7a68', shoes: 0xd8d2c0,
+  hair: { color: '#2a1d14', style: 'short' }, head: { brow: '#2a1d14' },
+  top: '#cfc8b8', pants: '#cfc8b8',            // однотонная одежда; для принтов и складок — свои torso(x, w, h, R), arm, leg
+};
+const b = makeBody(ENFERMERA);   // b.g — группа; шарниры: b.legL/kneeL, b.armL/elbowL, b.head …
+```
+
+- Текстуры рисуются на canvas. У торса и головы перед персонажа — `u = 0.75`, спина — `u = 0.25`, низ части тела — низ холста. Лицо рисует `paintHead`, высоты — в «эталонных» долях роста (глаза 0.097, рот 0.063, линия волос 0.134).
+- `dream` — сила эффекта сна (0 — резко, 1 — полностью «из сна»). Для особых правил, как у El Que Mira, меняйте `g.userData.dream.value` в `dreamUpdate`.
+- Добавьте группу персонажа в `game.gfx.chars` — так композиция эффекта знает, где он на экране. Сетки уже лежат на слое 1.
+- Крупные скриншоты спереди, сбоку и сзади — в `tests/characters.py` по образцу существующих.
+
 ## Флаги и сохранения
 
 - Новые флаги просто начинайте использовать через `g.set('nombreFlag')`; описывайте их в таблице флагов в [GAME_DESIGN.md](GAME_DESIGN.md).

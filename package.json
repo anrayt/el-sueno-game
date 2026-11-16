@@ -11,7 +11,9 @@
     "test:mobile": "node build.js && python3 tests/e2e.py m",
     "test:lectura": "node build.js && python3 tests/e2e_lectura.py && python3 tests/e2e_lectura.py m",
     "test:saves": "node build.js && python3 tests/e2e_saves.py",
-    "test:all": "node build.js && python3 tests/e2e.py && python3 tests/e2e.py m && python3 tests/e2e_lectura.py && python3 tests/e2e_lectura.py m && python3 tests/e2e_saves.py",
+    "test:characters": "node build.js && python3 tests/characters.py",
+    "perf": "node build.js && python3 tests/perf.py",
+    "test:all": "node build.js && python3 tests/e2e.py && python3 tests/e2e.py m && python3 tests/e2e_lectura.py && python3 tests/e2e_lectura.py m && python3 tests/e2e_saves.py && python3 tests/characters.py",
     "test:setup": "python3 -m pip install -r requirements.txt && python3 -m playwright install chromium",
     "build:site": "node build.js && node scripts/site.js",
     "deploy": "npm run build:site && npx --yes wrangler@4 pages deploy site --project-name=${CF_PAGES_PROJECT:-el-sueno} --branch=main"
