@@ -18,6 +18,7 @@ with sync_playwright() as p:
     pg.on('console',lambda m: errs.append(m.text) if m.type=='error' else None); pg.on('pageerror',lambda e: errs.append('PE '+str(e)))
     shot=lambda n: pg.screenshot(path=os.path.join(OUT,n+'.png'))
     pg.goto(URL); pg.wait_for_timeout(1200); pg.click('#tNew'); pg.wait_for_timeout(11500)
+    pg.wait_for_function("__sueno.mode==='play'",timeout=30000)
     for i in range(80):   # la intro
         if ev("!!__sueno.dlg.resolve"): pg.keyboard.press('KeyE'); pg.wait_for_timeout(120)
         elif ev("__sueno.busy"): pg.wait_for_timeout(250)
@@ -63,8 +64,12 @@ with sync_playwright() as p:
     ev("()=>{const g=__sueno;__look(-3,2.2,-34.4,-3,2.4,-37);for(let i=0;i<10;i++){g.time+=0.05;__frame();}}"); pg.wait_for_timeout(100); shot('el_que_mira_cerca')
     # ---- en escena: vuelve la cámara del juego ----
     ev("()=>{const g=__sueno,d=g.world.d;document.getElementById('rig').remove();g.cams.update=g.cams._upd;g.mode='play';d.watcher.visible=false;d.watcher.rotation.y=Math.PI;d.anselmo.position.set(-6.5,0,-42);d.anselmo.rotation.y=Math.PI/2;d.anselmo.visible=true;g.gfx.dream=true}")
-    def scene(name, js, wait=2200):
-        ev(f"()=>{{const g=__sueno;{js}}}"); pg.wait_for_timeout(wait); shot(name)
+    def scene(name, js, wait=2200):   # los sucesos de zona abren frases: se pasan antes de la foto
+        ev(f"()=>{{const g=__sueno;{js}}}"); pg.wait_for_timeout(600)
+        for i in range(40):
+            if ev("!!__sueno.dlg.resolve"): pg.keyboard.press('KeyE'); pg.wait_for_timeout(150)
+            else: break
+        pg.wait_for_timeout(wait); shot(name)
     scene('escena_callejon', "g.toStreet({x:0.2,z:-4.5,ry:Math.PI})")
     scene('escena_plaza_anselmo', "g.toStreet({x:-3.4,z:-40.6,ry:-1.6})")
     scene('escena_banco', "g.setScreen('plaza2')")

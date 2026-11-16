@@ -20,6 +20,8 @@ with sync_playwright() as p:
     ev("()=>{const g=__sueno;g.busy=false;g.dlg.hide&&g.dlg.hide();g.ui.fade(false,'',0);g.player.lie=0;g.player.sync();g.mode='play'}"); pg.wait_for_timeout(9000)
     ev("()=>{const g=__sueno;g.dlg.resolve&&g.dlg.advance();}")
     has=ev("'sueno' in __sueno")
+    if has:   # прогрев: первая компиляция шейдеров эффекта не должна попасть в замер первой сцены
+        for on in ('true','false','true'): ev(f"()=>__sueno.setSueno({on})"); pg.wait_for_timeout(1500)
     out={}
     for name,js in SCENES.items():
         ev(f"()=>{{const g=__sueno;{js}}}"); pg.wait_for_timeout(1500)
@@ -28,6 +30,5 @@ with sync_playwright() as p:
             if on is not None: ev(f"()=>__sueno.setSueno({'true' if on else 'false'})"); pg.wait_for_timeout(600)
             row['sí' if on else ('no' if on is False else 'fps')]=fps(ev)
         out[name]=row; print(name,row,flush=True)
-        os.makedirs(os.path.join(os.path.dirname(__file__),'screenshots','characters'),exist_ok=True)
     b.close()
 print(json.dumps({'viewport':[W,H],'fps':out},ensure_ascii=False))

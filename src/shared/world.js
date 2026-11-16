@@ -298,12 +298,12 @@ export const CAMS = [
   { id: 'verja', test: () => false, pos: [-2.9, 1.0, -76.4], fov: 55, fixed: [0.9, 2.7, -90] },
 ];
 export class CameraManager {
-  constructor() { this.cam = new THREE.PerspectiveCamera(50, 1, 0.1, 140); this.cur = null; this.target = new THREE.Vector3(); this.force = null; this.switched = false; this.shake = 0; }
+  constructor() { this.cam = new THREE.PerspectiveCamera(50, 1, 0.1, 140); this.onCut = null; this.cur = null; this.target = new THREE.Vector3(); this.force = null; this.switched = false; this.shake = 0; }
   byId(id) { return CAMS.find(c => c.id === id); }
   update(dt, player, time) {
     const c = this.byId(this.force || this.base) || CAMS.find(c => c.test(player.pos.x, player.pos.z));
     const want = c.fixed ? new THREE.Vector3(...c.fixed) : new THREE.Vector3(player.pos.x, c.yoff || 1.25, player.pos.z);
-    if (c !== this.cur) { this.cur = c; this.cam.position.set(...c.pos); this.applyFov(); this.target.copy(want); this.switched = true; }
+    if (c !== this.cur) { this.cur = c; this.cam.position.set(...c.pos); this.applyFov(); this.target.copy(want); this.switched = true; if (this.onCut) this.onCut(); }
     else this.target.lerp(want, Math.min(1, dt * 3.2));
     this.cam.position.set(c.pos[0] + Math.sin(time * 0.4) * 0.03 + (Math.random() - 0.5) * this.shake, c.pos[1] + Math.sin(time * 0.53) * 0.02 + (Math.random() - 0.5) * this.shake, c.pos[2]);
     this.cam.lookAt(this.target); this.shake *= Math.pow(0.02, dt);
@@ -327,7 +327,7 @@ const QUAD_VS = 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(positio
 const NOISE = 'float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); } float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y); }';
 /* eco: guarda lo que ya se vio del personaje y lo apaga poco a poco */
 const ECHO_FS = `precision highp float; uniform sampler2D tC,tCD,tSD,tP; uniform float decay; varying vec2 vUv;
-  void main(){ vec4 p=texture2D(tP,vUv); p.a*=decay; float cd=texture2D(tCD,vUv).r, cov=step(cd,.99999), vis=step(cd,texture2D(tSD,vUv).r+.00002);
+  void main(){ vec4 p=texture2D(tP,vUv); p.a=max(p.a*decay-2./255.,0.); float cd=texture2D(tCD,vUv).r, cov=step(cd,.99999), vis=step(cd,texture2D(tSD,vUv).r+.00002);
     vec4 c=texture2D(tC,vUv); float a=cov*vis*c.a*.6; gl_FragColor = a>p.a ? vec4(c.rgb,a) : p; }`;
 /* composición: escenario + personajes «de sueño» */
 const COMP_FS = `precision highp float; uniform sampler2D tS,tSD,tC,tCD,tE; uniform vec2 cres; uniform float time,fear; varying vec2 vUv; ${NOISE}
@@ -340,22 +340,22 @@ const COMP_FS = `precision highp float; uniform sampler2D tS,tSD,tC,tCD,tE; unif
       cb+=c; md=min(md,mix(1.,d,c)); ca+=q.rgb*c; sa+=q.a*c; }
     if(cov+cb<.5){ gl_FragColor=vec4(mix(sc,e.rgb,e.a),1.); return; }
     float n=cb; cb/=8.; ca/=max(n,1.);
-    float s=cov>.5 ? cc.a : sa/max(n,1.); s=clamp(s*(1.+fear*.9),0.,1.);
+    float s=cov>.5 ? cc.a : sa/max(n,1.); s=clamp(s*(1.+fear*.9),0.,1.); float sk=s*s;   // sk: lo que borra detalles crece más despacio (con 0.4 el protagonista se reconoce)
     vec3 col=cc.rgb;
-    if(cov>.5 && s>.02){ // Kuwahara: de cuatro cuadrantes (2×2 muestras espaciadas) se queda con el más uniforme → pinceladas planas
+    if(cov>.5 && sk>.02){ // Kuwahara: de cuatro cuadrantes (2×2 muestras espaciadas) se queda con el más uniforme → pinceladas planas
       vec3 m0=vec3(0.),m1=vec3(0.),m2=vec3(0.),m3=vec3(0.),s0=vec3(0.),s1=vec3(0.),s2=vec3(0.),s3=vec3(0.); float st=1.3*(1.+s);
       for(int j=0;j<2;j++) for(int i=0;i<2;i++){ vec2 o=(vec2(float(i),float(j))+.5)*st*px;
         vec3 a=texture2D(tC,vUv+vec2(-o.x,-o.y)).rgb, b=texture2D(tC,vUv+vec2(o.x,-o.y)).rgb, c=texture2D(tC,vUv+vec2(-o.x,o.y)).rgb, d=texture2D(tC,vUv+o).rgb;
         m0+=a; s0+=a*a; m1+=b; s1+=b*b; m2+=c; s2+=c*c; m3+=d; s3+=d*d; }
       m0*=.25; m1*=.25; m2*=.25; m3*=.25; float v0=dot(s0*.25-m0*m0,vec3(1.)), v1=dot(s1*.25-m1*m1,vec3(1.)), v2=dot(s2*.25-m2*m2,vec3(1.)), v3=dot(s3*.25-m3*m3,vec3(1.));
       vec3 k=m0; float v=v0; if(v1<v){v=v1;k=m1;} if(v2<v){v=v2;k=m2;} if(v3<v){k=m3;}
-      col=mix(cc.rgb,k,s); col=mix(col,ca,.3*s*cb); }
+      col=mix(cc.rgb,k,sk); col=mix(col,ca,.3*sk*cb); }
     else if(cov<.5) col=ca;
     // el contorno se deshace con ruido que se mueve
     float nz=vn(vUv*cres*.28+vec2(time*1.3,-time*.9));
     float a=mix(cov, smoothstep(.12+.62*nz, .5+.45*nz, cb+cov*.3), s);
     // bruma del sueño: menos saturado, un poco más claro y cálido
-    float l=dot(col,vec3(.3,.59,.11)); col=mix(col, vec3(l)*vec3(1.08,1.,.9)+.035, .3*s);
+    float l=dot(col,vec3(.3,.59,.11)); col=mix(col, vec3(l)*vec3(1.08,1.,.9)+.035, .3*sk);
     float vis=step(cov>.5 ? cd : md, sd+.00002);
     vec3 halo=(ca*.9+vec3(.82,.79,.72)*.12)*cb*(1.-a)*s;
     vec3 o=mix(sc,col,a*vis)+halo*vis;
@@ -363,7 +363,8 @@ const COMP_FS = `precision highp float; uniform sampler2D tS,tSD,tC,tCD,tE; unif
 export class Gfx {
   constructor(canvas) {
     this.r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false }); this.r.setPixelRatio(1); this.r.autoClear = true;
-    this.dream = true; this.ei = 0;
+    this.canDream = this.r.capabilities.isWebGL2 || this.r.extensions.has('WEBGL_depth_texture'); this.dream = this.canDream; this.ei = 0; this._clearE = false;
+    this.corners = Array.from({ length: 8 }, () => new THREE.Vector3());
     this.u = { tD: { value: null }, tM: { value: null }, box: { value: new THREE.Vector4(2, 2, -1, -1) }, time: { value: 0 }, fear: { value: 0 }, dark: { value: 1 }, red: { value: 0 }, res: { value: new THREE.Vector2(640, 480) } };
     this.chars = []; this.boxes = []; this._s = new THREE.Sphere(); this._v = new THREE.Vector3();
     this.cu = { tS: { value: null }, tSD: { value: null }, tC: { value: null }, tCD: { value: null }, tE: { value: null }, cres: { value: new THREE.Vector2(320, 240) }, time: this.u.time, fear: this.u.fear };
@@ -389,37 +390,49 @@ export class Gfx {
   resize() { const w = window.innerWidth, h = window.innerHeight; this.r.setSize(w, h, false); const lh = Math.min(Math.round(h * Math.min(window.devicePixelRatio || 1, 2)), 540), lw = Math.max(2, Math.round(lh * w / h));
     [this.rt, this.rtM, this.rtC, ...(this.rtE || [])].forEach(t => t && t.dispose());
     const lin = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }, depth = (w, h) => { const d = new THREE.DepthTexture(w, h); d.type = THREE.UnsignedIntType; return d; };
-    const cw = Math.max(2, lw >> 1), ch = Math.max(2, lh >> 1);   // personajes a media resolución
-    this.rt = new THREE.WebGLRenderTarget(lw, lh, Object.assign({ depthBuffer: true, depthTexture: depth(lw, lh) }, lin));
+    const cw = Math.max(2, Math.round(lw * 0.75)), ch = Math.max(2, Math.round(lh * 0.75));   // personajes a 3/4 de la resolución
+    this.rt = new THREE.WebGLRenderTarget(lw, lh, Object.assign({ depthBuffer: true }, this.canDream ? { depthTexture: depth(lw, lh) } : {}, lin));
     this.rtM = new THREE.WebGLRenderTarget(lw, lh, Object.assign({ depthBuffer: false }, lin));
     this.rtC = new THREE.WebGLRenderTarget(cw, ch, Object.assign({ depthBuffer: true, depthTexture: depth(cw, ch) }, lin));
     this.rtE = [0, 1].map(() => new THREE.WebGLRenderTarget(cw, ch, Object.assign({ depthBuffer: false }, lin)));
-    [this.rtE[0], this.rtE[1]].forEach(t => { this.r.setRenderTarget(t); this.r.setClearColor(0, 0); this.r.clear(); }); this.r.setRenderTarget(null); this.r.setClearColor(0, 1);
+    this.cut();
     this.cu.tS.value = this.rt.texture; this.cu.tSD.value = this.rt.depthTexture; this.cu.tC.value = this.rtC.texture; this.cu.tCD.value = this.rtC.depthTexture; this.cu.cres.value.set(cw, ch);
     this.u.res.value.set(lw, lh); return w / h; }
   pass(m, target) { this.quad.material = m; this.r.setRenderTarget(target); this.r.render(this.ps, this.pc); }
+  /** Corte de cámara (o cambio de tamaño): se borra el eco y la memoria de dónde estaban los personajes. */
+  cut() { if (!this.rtE) return; this.rtE.forEach(t => { this.r.setRenderTarget(t); this.r.setClearColor(0, 0); this.r.clear(); }); this.r.setRenderTarget(null); this.r.setClearColor(0, 1); this.boxes.length = 0; this._clearE = false; }
   /** Rectángulo (en uv) que ocupan en pantalla los personajes visibles, con margen para el halo; null si no se ve ninguno. */
-  charBox(cam) { const s = this._s, v = this._v, W = this.u.res.value.x, Hh = this.u.res.value.y, t = Math.tan(cam.fov * Math.PI / 360); let x0 = 2, y0 = 2, x1 = -1, y1 = -1;
+  charBox(cam) { const v = this._v, W = this.u.res.value.x, Hh = this.u.res.value.y, mx = 14 / W, my = 14 / Hh; let x0 = 2, y0 = 2, x1 = -1, y1 = -1;
     for (const g of this.chars) { let o = g, vis = true; while (o) { if (!o.visible) { vis = false; break; } o = o.parent; } if (!vis) continue;
-      if (!g.userData.bs) { g.userData.bs = new THREE.Box3().setFromObject(g).getBoundingSphere(new THREE.Sphere()); g.userData.bs.applyMatrix4(g.matrixWorld.clone().invert()); }
-      s.copy(g.userData.bs).applyMatrix4(g.matrixWorld); v.copy(s.center).applyMatrix4(cam.matrixWorldInverse); const dz = -v.z;
-      if (dz < s.radius) { if (dz > -s.radius) return [0, 0, 1, 1]; continue; }   // la cámara está casi dentro: toda la pantalla
-      v.applyMatrix4(cam.projectionMatrix); const ry = s.radius / (dz * t) * 0.5 + 14 / Hh, rx = ry * Hh / W, cx = v.x * 0.5 + 0.5, cy = v.y * 0.5 + 0.5;
-      if (cx + rx < 0 || cx - rx > 1 || cy + ry < 0 || cy - ry > 1) continue;
-      x0 = Math.min(x0, cx - rx); y0 = Math.min(y0, cy - ry); x1 = Math.max(x1, cx + rx); y1 = Math.max(y1, cy + ry); }
+      if (!g.userData.lb) { // caja local solo de las mallas del personaje (no su sombra en el suelo), con margen para brazos y melena
+        const inv = g.matrixWorld.clone().invert(), lb = new THREE.Box3(), tb = new THREE.Box3(); g.updateMatrixWorld(true);
+        g.traverse(m => { if (m.isMesh && m.layers.mask === 1 << CHAR_LAYER) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); tb.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld).applyMatrix4(inv); lb.union(tb); } });
+        g.userData.lb = lb.expandByScalar(0.06); }
+      const b = g.userData.lb; let k = 0, front = 0;
+      for (const xx of [b.min.x, b.max.x]) for (const yy of [b.min.y, b.max.y]) for (const zz of [b.min.z, b.max.z]) { const c = this.corners[k++].set(xx, yy, zz).applyMatrix4(g.matrixWorld); v.copy(c).applyMatrix4(cam.matrixWorldInverse); if (-v.z > cam.near) front++; }
+      if (front === 0) continue; if (front < 8) return [0, 0, 1, 1];   // la cámara corta la caja: toda la pantalla
+      for (const c of this.corners) { c.project(cam); const cx = c.x * 0.5 + 0.5, cy = c.y * 0.5 + 0.5; x0 = Math.min(x0, cx - mx); y0 = Math.min(y0, cy - my); x1 = Math.max(x1, cx + mx); y1 = Math.max(y1, cy + my); } }
+    if (x1 < 0 || y1 < 0 || x0 > 1 || y0 > 1) return null;
     return x1 < x0 ? null : [Math.max(0, x0), Math.max(0, y0), Math.min(1, x1), Math.min(1, y1)]; }
   render(scene, cam, time) { const dt = clamp(time - (this._t == null ? time : this._t), 0, 0.1); this._t = time; this.u.time.value = time; const r = this.r;
     this.u.tD.value = this.rt.texture; this.u.box.value.set(2, 2, -1, -1);
     if (!this.dream) { cam.layers.enableAll(); r.setRenderTarget(this.rt); r.render(scene, cam); cam.layers.set(0); this.boxes.length = 0; this.pass(this.postM, null); return; }
     cam.layers.set(0); r.setRenderTarget(this.rt); r.render(scene, cam);                                   // escenario (+ su profundidad)
-    const bg = scene.background; scene.background = null; cam.layers.set(CHAR_LAYER); r.setClearColor(0, 0);
-    r.setRenderTarget(this.rtC); r.clear(); r.render(scene, cam); scene.background = bg; cam.layers.set(0); r.setClearColor(0, 1);   // personajes
-    const a = this.rtE[this.ei], b = this.rtE[1 - this.ei]; this.ei = 1 - this.ei; this.eu.tP.value = a.texture; this.eu.decay.value = Math.pow(0.06, dt); this.pass(this.echoM, b);
-    // la composición solo donde hay personajes ahora o los hubo hace un momento (el eco tarda ~1 s en apagarse)
     cam.updateMatrixWorld(); const bx = this.charBox(cam), now = time; if (bx) this.boxes.push([now, bx]); while (this.boxes.length && now - this.boxes[0][0] > 1.2) this.boxes.shift();
-    if (this.boxes.length) { let x0 = 1, y0 = 1, x1 = 0, y1 = 0; for (const [, q] of this.boxes) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[2]); y1 = Math.max(y1, q[3]); }
-      const W = this.u.res.value.x, Hh = this.u.res.value.y, px = Math.floor(x0 * W), py = Math.floor(y0 * Hh), pw = Math.ceil(x1 * W) - px, ph = Math.ceil(y1 * Hh) - py;
-      this.cu.tE.value = b.texture; this.rtM.scissor.set(px, py, pw, ph); this.rtM.scissorTest = true; this.pass(this.compM, this.rtM);   // en three el recorte va en el propio render target
-      this.u.tM.value = this.rtM.texture; this.u.box.value.set((px + 0.5) / W, (py + 0.5) / Hh, (px + pw - 0.5) / W, (py + ph - 0.5) / Hh); }
+    if (!this.boxes.length) { if (this._clearE) this.cut(); this.pass(this.postM, null); return; }   // no se ve ningún personaje: nada más que hacer
+    const bg = scene.background;
+    // personajes (autoClear: fondo transparente). Pasada barata: las matrices ya están al día y el escenario
+    // se oculta para que three no lo recorra otra vez; solo quedan las luces y los personajes.
+    const hid = this._hid || (this._hid = []); hid.length = 0;
+    for (const o of scene.children) if (o.visible && !o.isLight && !this.chars.includes(o)) { o.visible = false; hid.push(o); }
+    try { scene.background = null; scene.matrixWorldAutoUpdate = false; cam.layers.set(CHAR_LAYER); r.setClearColor(0, 0); r.setRenderTarget(this.rtC); r.render(scene, cam); }
+    finally { for (const o of hid) o.visible = true; scene.background = bg; scene.matrixWorldAutoUpdate = true; cam.layers.set(0); r.setClearColor(0, 1); }
+    const a = this.rtE[this.ei], b = this.rtE[1 - this.ei]; this.ei = 1 - this.ei; this.eu.tP.value = a.texture; this.eu.decay.value = Math.pow(0.06, dt); this.pass(this.echoM, b); this._clearE = true;
+    // la composición solo donde hay personajes ahora o los hubo hace un momento (el eco tarda ~1 s en apagarse)
+    let x0 = 1, y0 = 1, x1 = 0, y1 = 0; for (const [, q] of this.boxes) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[2]); y1 = Math.max(y1, q[3]); }
+    const W = this.u.res.value.x, Hh = this.u.res.value.y, px = Math.floor(x0 * W), py = Math.floor(y0 * Hh), pw = Math.ceil(x1 * W) - px, ph = Math.ceil(y1 * Hh) - py;
+    this.cu.tE.value = b.texture; this.rtM.scissor.set(px, py, pw, ph); this.rtM.scissorTest = true; this.pass(this.compM, this.rtM);   // en three el recorte va en el propio render target
+    // la caja en uv; pegada al borde de la pantalla se abre del todo (si no, queda una línea de 1 px sin personaje)
+    this.u.tM.value = this.rtM.texture; this.u.box.value.set(px <= 0 ? -1 : (px + 0.5) / W, py <= 0 ? -1 : (py + 0.5) / Hh, px + pw >= W ? 2 : (px + pw - 0.5) / W, py + ph >= Hh ? 2 : (py + ph - 0.5) / Hh);
     this.pass(this.postM, null); }
 }

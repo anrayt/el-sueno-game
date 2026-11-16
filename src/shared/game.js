@@ -37,9 +37,10 @@ export class Game {
   boot() {
     game = this;
     this.lang = new LanguageSystem(this); this.inv = new Inventory(this); this.lore = new LoreArchive(this); this.ui = new UIManager(this, { badge: true }); this.dlg = new DialogueSystem(this); this.puzzle = new PuzzleSystem(this);
-    this.gfx = new Gfx($('c')); this.gfx.dream = this.sueno; this.world = new SceneManager(this); this.world.build(); this.player = new Player(this.world); this.cams = new CameraManager();
+    this.gfx = new Gfx($('c')); this.gfx.dream = this.sueno && this.gfx.canDream; this.world = new SceneManager(this); this.world.build(); this.player = new Player(this.world); this.cams = new CameraManager();
     this.hs = new HotspotSystem(this); this.inter = new InteractionSystem(this); this.input = new WalkInput(this);
     this.gfx.chars = [this.player.g, this.world.d.anselmo, this.world.d.watcher, this.world.d.sombra];   // para el efecto de sueño
+    this.cams.onCut = () => this.gfx.cut();
     this.player.stepCb = run => this.audio.step(this.surface(), run);
     this.world.sync(this.f); this.world.snap(); this.cams.resize(this.gfx.resize()); this.bindInput(); this.ui.syncSound(); this.syncOptions();
     const has = !!this.save.load(); $('tCont').classList.toggle('hidden', !has);
@@ -102,7 +103,7 @@ export class Game {
     this.modo = this.modo === 'lectura' ? 'normal' : 'lectura'; this.saveSettings(); this.syncOptions(); if (this.mode === 'play') { this.applyModo(); this.saveNow(); }
     this.ui.toast(this.modo === 'lectura' ? 'Modo lectura: no caminas. Miras, lees y eliges.' : 'Modo normal: caminas por las calles.'); }
   /** Efecto de sueño en los personajes (ajuste; por defecto sí). */
-  setSueno(on) { this.sueno = !!on; this.gfx.dream = this.sueno; this.saveSettings(); this.syncOptions(); }
+  setSueno(on) { this.sueno = !!on; this.gfx.dream = this.sueno && this.gfx.canDream; this.saveSettings(); this.syncOptions(); }
   toggleJoy() { this.joyOn = !this.joyOn; this.saveSettings(); this.syncOptions(); this.syncHud(); }
   /** Textos de los ajustes (pausa y título). */
   syncOptions() { const m = this.modo === 'lectura' ? 'Modo: lectura' : 'Modo: normal'; $('modoB').textContent = m; $('tModo').textContent = m; $('joyB').textContent = this.joyOn ? 'Mando en pantalla: sí' : 'Mando en pantalla: no'; $('suenoB').textContent = this.sueno ? 'Efecto de sueño: sí' : 'Efecto de sueño: no';
@@ -171,7 +172,7 @@ export class Game {
     this.audio.update(dt, { zone: z, threat, hum, radio: z === 'tienda' ? clamp(1 - D(17.9, -37) / 11, 0.12, 1) : 0, ring: this.ringing() && this.mode === 'play' ? (z === 'tienda' ? 0.25 : clamp(1 - D(8.5, -43.5) / 45, 0.12, 1)) : 0, red: !!f.puertaAbierta });
     const u = this.gfx.u; u.fear.value += (Math.max(threat, (1 - this.state.cordura / 100) * 0.45) - u.fear.value) * Math.min(1, dt * 3); u.red.value = this.world.d.hospV || 0;
     const tv = (this.dlg.active || this.ui.modal || this.mode !== 'play') ? 'hidden' : 'visible'; if (tv !== this._tv) { this._tv = tv; $('touch').style.visibility = tv; }
-    this.ui.estado(this.state.cordura, threat); dreamUpdate(this.world.d, this.cams.cam); this.gfx.render(this.world.scene, this.cams.cam, this.time);
+    this.ui.estado(this.state.cordura, threat); this.cams.cam.updateMatrixWorld(); dreamUpdate(this.world.d, this.cams.cam); this.gfx.render(this.world.scene, this.cams.cam, this.time);
   }
   /** Sucesos al llegar a una zona por primera vez y disparadores ligados a la posición (solo en la calle). */
   events() { const p = this.player, f = this.f, z = p.zone;

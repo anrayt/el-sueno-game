@@ -180,7 +180,8 @@ export function makeBody(spec) {
   if (spec.scarf) { const sc = M(T(64, 32, (x, w, h, R) => { Pnt.fill(x, w, h, spec.scarf); Pnt.folds(x, w, h, R, 20, 0.35); }));
     const ring = lathe([[0.032 * H, -0.012 * H], [0.045 * H, -0.004 * H], [0.044 * H, 0.012 * H], [0.03 * H, 0.02 * H]], 9); ring.scale(1, 1, 0.9); mesh(bake(ring, V(0, neckY, 0), [], H), sc, root).position.set(0, neckY, 0.005 * H); }
   if (spec.eye) { // El Que Mira: un ojo claro delante y otro detrás; brillan en la niebla
-    const em = dreamy(new THREE.MeshBasicMaterial({ color: 0xd8d2c0, fog: false }), dream), ez = zFront + 0.003 * H * k;
+    // el ojo nunca se emborrona: siempre es lo más nítido de la figura
+    const em = dreamy(new THREE.MeshBasicMaterial({ color: 0xd8d2c0, fog: false }), { value: 0.05 }), ez = zFront + 0.003 * H * k;
     [0, PI].forEach(a => { const e = mesh(new THREE.CircleGeometry(0.016 * H * k, 10), em, head); e.position.set(0, eyeY, a ? -ez : ez); e.rotation.y = a; });
   }
   return body;
