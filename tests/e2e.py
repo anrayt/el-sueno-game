@@ -17,18 +17,19 @@ UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 
 errs=[]; res=[]
 def ok(name,cond,extra=''):
     res.append((name,bool(cond))); print(('PASS ' if cond else 'FAIL ')+name+(' — '+str(extra)[:500] if not cond else ''))
-    if not cond and os.environ.get('GITHUB_ACTIONS'): print(f'::error title=e2e {"mobile" if MOBILE else "desktop"}::{name} — {str(extra)[:300]}')
+    if not cond and os.environ.get('GITHUB_ACTIONS'): print(f'::error title=e2e {"mobile" if MOBILE else "desktop"}::{name} — {str(extra)[:900]}')
 with sync_playwright() as p:
     b=p.chromium.launch(executable_path=CHROME,args=ARGS) if CHROME else p.chromium.launch(args=ARGS)
     ctx=b.new_context(viewport={'width':667,'height':375},has_touch=True,is_mobile=True,device_scale_factor=1,user_agent=UA) if MOBILE else b.new_context(viewport={'width':640,'height':360})
-    pg=ctx.new_page(); cdp=ctx.new_cdp_session(pg) if MOBILE else None
+    pg=ctx.new_page(); cdp=ctx.new_cdp_session(pg)
+    if os.environ.get('E2E_SLOW'): cdp.send('Emulation.setCPUThrottlingRate',{'rate':float(os.environ['E2E_SLOW'])})   # имитация медленного раннера CI
     pg.on('console',lambda m: errs.append(m.type+': '+m.text) if m.type=='error' else None)
     pg.on('pageerror',lambda e: errs.append('PAGEERROR: '+str(e)))
     ev=pg.evaluate
     shot=lambda n: pg.screenshot(path=os.path.join(SHOTS,PRE+n+'.png'))
     tap=(lambda sel: pg.tap(sel)) if MOBILE else (lambda sel: pg.click(sel))
     point=(lambda x,y: pg.touchscreen.tap(x,y)) if MOBILE else (lambda x,y: pg.mouse.click(x,y))
-    def st(): return json.loads(ev("()=>{const g=__sueno;return JSON.stringify({f:g.f,inv:g.state.inv,docs:g.state.docs,words:g.state.words.length,arch:g.state.archive,ecos:g.state.ecos,cor:g.state.cordura,x:g.player.pos.x,z:g.player.pos.z,zone:g.player.zone,scr:g.scr,ret:g.state.ret,modo:g.modo,busy:g.busy,going:g.going,modal:g.ui.modal,dlg:!!g.dlg.resolve,choice:!!g.dlg.choice,chase:!!g.chase,mode:g.mode,cam:g.cams.cur&&g.cams.cur.id,tries:g.state.tries,near:g.inter.near&&g.inter.near.id,dest:!!g.input.dest})}"))
+    def st(): return json.loads(ev("()=>{const g=__sueno;const d=g.input.dest,w=g.world.d.watcher;return JSON.stringify({x:+g.player.pos.x.toFixed(2),z:+g.player.pos.z.toFixed(2),zone:g.player.zone,scr:g.scr,ret:g.state.ret,cor:Math.round(g.state.cordura),busy:g.busy,going:g.going,modal:g.ui.modal,dlg:!!g.dlg.resolve,choice:!!g.dlg.choice,chase:!!g.chase,dist:g.chase&&+(g.chase.dist||0).toFixed(1),wz:w.visible?+w.position.z.toFixed(1):null,mode:g.mode,modo:g.modo,cam:g.cams.cur&&g.cams.cur.id,near:g.inter.near&&g.inter.near.id,dest:!!d,destXZ:d&&[+d.x.toFixed(1),+d.z.toFixed(1)],keys:Object.keys(g.input.keys).filter(k=>g.input.keys[k]),lie:g.player.lie,gt:+g.time.toFixed(1),tries:g.state.tries,inv:g.state.inv,docs:g.state.docs,words:g.state.words.length,arch:g.state.archive,ecos:g.state.ecos,f:g.f})}"))
     def flush(maxn=120):
         for i in range(maxn):
             s=st()
@@ -107,6 +108,8 @@ with sync_playwright() as p:
     # ---- título y comienzo ----
     pg.goto(URL); pg.wait_for_timeout(1200)
     ok('carga: three r149 + juego', ev('__sueno.three')=='149' and ev('!!window.__sueno'))
+    fps=ev("new Promise(r=>{let n=0;const t0=performance.now();const f=()=>{n++;performance.now()-t0<2000?requestAnimationFrame(f):r(n/2)};requestAnimationFrame(f)})"); print('FPS',fps)
+    if os.environ.get('GITHUB_ACTIONS'): print(f'::notice title=e2e {"mobile" if MOBILE else "desktop"}::FPS {fps}')
     ok('título: sin «Continuar», modo normal', ev("document.getElementById('tCont').classList.contains('hidden')") and 'normal' in ev("document.getElementById('tModo').textContent"))
     if MOBILE: shot('title')
     tap('#tNew'); pg.wait_for_timeout(11500); r=flush()
@@ -144,7 +147,7 @@ with sync_playwright() as p:
     # quiosco: de la calle al plano fijo y vuelta
     act(-5.2,-29.2); s=st(); ok('quiosco: el periódico abre el plano fijo y se lee', s['scr']=='quiosco' and s['cam']=='quiosco' and 'periodico' in s['docs'] and 'ciudad' in s['arch'], s)
     pg.wait_for_timeout(400); ok('plano fijo: puntos activos y solo la salida «Salir»', ev("document.querySelectorAll('.hs.on').length")==1 and ev("[...document.querySelectorAll('#nav .nv')].map(b=>b.textContent)")==['Salir'], ev("[...document.querySelectorAll('#nav .nv')].map(b=>b.textContent)"))
-    shot('quiosco'); salir(); s=st(); ok('«Salir» vuelve a la calle, al punto de entrada', s['scr'] is None and abs(s['x']+5.2)<0.15 and abs(s['z']+29.2)<0.15 and s['ret'] is None, (s['x'],s['z'],s['scr']))
+    shot('quiosco'); salir(); s=st(); ok('«Salir» vuelve a la calle, al punto de entrada', s['scr'] is None and abs(s['x']+5.2)<0.15 and abs(s['z']+29.2)<0.15 and s['ret'] is None, s)
     # cabina
     r=act(7.75,-43.5); ok('cabina: plano fijo y elección', r=='choice' and len(opts())==3 and st()['scr']=='plaza3', (r,opts(),st()['scr'])); pick('Quién'); flush()
     s=st(); ok('llamada → moneda', 'moneda' in s['inv'] and s['f'].get('llamada1') and not ev('__sueno.ringing()'))
