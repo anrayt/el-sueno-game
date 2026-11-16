@@ -15,6 +15,12 @@ PRE='h_m_' if MOBILE else 'h_'
 KEY='el_sueno_cap1_v2'   # SAVE_KEYS.hybrid в src/shared/data.js
 UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 errs=[]; res=[]
+if os.environ.get('GITHUB_ACTIONS'):   # исключение в тесте (таймаут ожидания и т. п.) — тоже аннотацией прогона
+    import traceback
+    def _hook(t,e,tb):
+        fr=[f for f in traceback.extract_tb(tb) if f.filename==__file__]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
+        print(f'::error title=e2e hibrido excepción::{t.__name__} en {where} — {str(e)[:700]}'.replace('\n',' | ')); sys.__excepthook__(t,e,tb)
+    sys.excepthook=_hook
 def ok(name,cond,extra=''):
     res.append((name,bool(cond))); print(('PASS ' if cond else 'FAIL ')+name+(' — '+str(extra)[:500] if not cond else ''))
     if not cond and os.environ.get('GITHUB_ACTIONS'): print(f'::error title=e2e {"mobile" if MOBILE else "desktop"}::{name} — {str(extra)[:900]}')

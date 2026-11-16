@@ -14,6 +14,12 @@ ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','
 # ключи — как в src/shared/data.js (SAVE_KEYS, LEGACY_SAVE_KEY, SET_KEY)
 K2, KQ, KW, KL, KS = 'el_sueno_cap1_v2', 'el_sueno_cap1_quest_v1', 'el_sueno_cap1_walk_v1', 'el_sueno_cap1_v1', 'el_sueno_ajustes_v1'
 errs=[]; res=[]
+if os.environ.get('GITHUB_ACTIONS'):   # исключение в тесте (таймаут ожидания и т. п.) — тоже аннотацией прогона
+    import traceback
+    def _hook(t,e,tb):
+        fr=[f for f in traceback.extract_tb(tb) if f.filename==__file__]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
+        print(f'::error title=e2e saves excepción::{t.__name__} en {where} — {str(e)[:700]}'.replace('\n',' | ')); sys.__excepthook__(t,e,tb)
+    sys.excepthook=_hook
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS ' if cond else 'FAIL ')+name+(' — '+str(extra)[:400] if not cond else ''))
     if not cond and os.environ.get('GITHUB_ACTIONS'): print(f'::error title=e2e saves::{name} — {str(extra)[:300]}')

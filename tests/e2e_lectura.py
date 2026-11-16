@@ -13,6 +13,12 @@ CHROME=os.environ.get('CHROME_PATH')  # необязательно: путь к 
 ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox','--autoplay-policy=no-user-gesture-required']
 MOBILE = len(sys.argv)>1
 errs=[]; res=[]
+if os.environ.get('GITHUB_ACTIONS'):   # исключение в тесте (таймаут ожидания и т. п.) — тоже аннотацией прогона
+    import traceback
+    def _hook(t,e,tb):
+        fr=[f for f in traceback.extract_tb(tb) if f.filename==__file__]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
+        print(f'::error title=e2e lectura excepción::{t.__name__} en {where} — {str(e)[:700]}'.replace('\n',' | ')); sys.__excepthook__(t,e,tb)
+    sys.excepthook=_hook
 SHOTS=os.path.join(os.path.dirname(__file__),'screenshots'); os.makedirs(SHOTS,exist_ok=True)
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS ' if cond else 'FAIL ')+name+(' — '+str(extra)[:400] if not cond else ''))
