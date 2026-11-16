@@ -17,8 +17,8 @@ UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 
 errs=[]; res=[]
 if os.environ.get('GITHUB_ACTIONS'):   # исключение в тесте (таймаут ожидания и т. п.) — тоже аннотацией прогона
     import traceback
-    def _hook(t,e,tb):
-        fr=[f for f in traceback.extract_tb(tb) if f.filename==__file__]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
+    def _hook(t,e,tb,F=__file__,traceback=traceback,sys=sys):
+        fr=[f for f in traceback.extract_tb(tb) if f.filename==F]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
         print(f'::error title=e2e hibrido excepción::{t.__name__} en {where} — {str(e)[:700]}'.replace('\n',' | ')); sys.__excepthook__(t,e,tb)
     sys.excepthook=_hook
 def ok(name,cond,extra=''):

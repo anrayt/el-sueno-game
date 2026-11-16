@@ -15,8 +15,8 @@ MOBILE = len(sys.argv)>1
 errs=[]; res=[]
 if os.environ.get('GITHUB_ACTIONS'):   # исключение в тесте (таймаут ожидания и т. п.) — тоже аннотацией прогона
     import traceback
-    def _hook(t,e,tb):
-        fr=[f for f in traceback.extract_tb(tb) if f.filename==__file__]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
+    def _hook(t,e,tb,F=__file__,traceback=traceback,sys=sys):
+        fr=[f for f in traceback.extract_tb(tb) if f.filename==F]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
         print(f'::error title=e2e lectura excepción::{t.__name__} en {where} — {str(e)[:700]}'.replace('\n',' | ')); sys.__excepthook__(t,e,tb)
     sys.excepthook=_hook
 SHOTS=os.path.join(os.path.dirname(__file__),'screenshots'); os.makedirs(SHOTS,exist_ok=True)

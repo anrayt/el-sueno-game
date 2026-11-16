@@ -16,8 +16,8 @@ K2, KQ, KW, KL, KS = 'el_sueno_cap1_v2', 'el_sueno_cap1_quest_v1', 'el_sueno_cap
 errs=[]; res=[]
 if os.environ.get('GITHUB_ACTIONS'):   # исключение в тесте (таймаут ожидания и т. п.) — тоже аннотацией прогона
     import traceback
-    def _hook(t,e,tb):
-        fr=[f for f in traceback.extract_tb(tb) if f.filename==__file__]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
+    def _hook(t,e,tb,F=__file__,traceback=traceback,sys=sys):
+        fr=[f for f in traceback.extract_tb(tb) if f.filename==F]; where=', '.join(f'{f.lineno}:{f.name}' for f in fr[-3:])
         print(f'::error title=e2e saves excepción::{t.__name__} en {where} — {str(e)[:700]}'.replace('\n',' | ')); sys.__excepthook__(t,e,tb)
     sys.excepthook=_hook
 def ok(name,cond,extra=''):
