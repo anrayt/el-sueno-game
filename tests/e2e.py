@@ -54,9 +54,12 @@ with sync_playwright() as p:
     def xy(x,y,z):   # punto del mundo → píxeles (o None si queda fuera de la pantalla)
         v=ev(f"()=>{{const g=__sueno,v=new g.player.pos.constructor({x},{y},{z}).project(g.cams.cam);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight,v.z]}}")
         W,H=ev("[innerWidth,innerHeight]"); return (v[0],v[1]) if v[2]<1 and 12<v[0]<W-12 and 60<v[1]<H-12 else None
+    def until(js,ms=25000):   # espera una condición del juego; en máquinas lentas (CI, SwiftShader) el juego va más despacio que el reloj
+        try: pg.wait_for_function(js,timeout=ms); return True
+        except Exception: return False
     def salir():   # del plano fijo a la calle
         if not st()['scr']: return
-        flush(); pg.wait_for_selector('#nav .nv',timeout=5000); tap('#nav .nv:has-text("Salir")'); pg.wait_for_function("!__sueno.scr && !__sueno.going",timeout=8000); pg.wait_for_timeout(250); flush()
+        flush(); pg.wait_for_selector('#nav .nv',timeout=5000); tap('#nav .nv:has-text("Salir")'); pg.wait_for_function("!__sueno.scr && !__sueno.going",timeout=25000); pg.wait_for_timeout(250); flush()
     def tp(x,z):
         salir(); ev(f"()=>__sueno.player.place({x},{z})"); pg.wait_for_timeout(250)
     def act(x,z):   # ir a un punto de la calle y usar el objeto cercano (E, o un toque sobre el objeto)
@@ -81,7 +84,7 @@ with sync_playwright() as p:
         return hs('anselmo') if st()['scr']=='plaza2' else act(-5.5,-42)
     def tienda():   # cruzar la puerta abierta de la tienda
         if st()['scr']=='tienda': return
-        tp(12.9,-34); pg.wait_for_function("__sueno.scr==='tienda' && !__sueno.going",timeout=8000); pg.wait_for_timeout(300); flush()
+        tp(12.9,-34); pg.wait_for_function("__sueno.scr==='tienda' && !__sueno.going",timeout=25000); pg.wait_for_timeout(300); flush()
     def book(tab):
         if MOBILE: tap('#hbInv' if tab==0 else '#hbCua')
         else: pg.keyboard.press('Tab' if tab==0 else 'KeyJ')
@@ -112,13 +115,13 @@ with sync_playwright() as p:
     if MOBILE:
         ok('táctil: por defecto sin joystick en pantalla', ev("document.body.classList.contains('touch') && document.getElementById('touch').classList.contains('hidden')"))
         # ir a un punto: toque en el suelo
-        c=xy(0.3,0,-4.6); z0=st()['z']; point(*c); pg.wait_for_function("!__sueno.input.dest",timeout=9000); s=st(); ok('toque en el suelo: el protagonista va a ese punto', abs(s['x']-0.3)<0.4 and abs(s['z']+4.6)<0.4 and s['z']<z0-1, (s['x'],s['z']))
+        c=xy(0.3,0,-4.6); z0=st()['z']; point(*c); until("!__sueno.input.dest"); s=st(); ok('toque en el suelo: el protagonista va a ese punto', abs(s['x']-0.3)<0.4 and abs(s['z']+4.6)<0.4 and s['z']<z0-1, (s['x'],s['z']))
     else:
-        z0=st()['z']; pg.keyboard.down('KeyW'); pg.wait_for_timeout(1500); pg.keyboard.up('KeyW'); s=st(); ok('teclado: W avanza (norte)', s['z']<z0-0.4,(z0,s['z']))
+        until("__sueno.player.lie===0"); z0=st()['z']; pg.keyboard.down('KeyW'); until(f"__sueno.player.pos.z<{z0-0.6}",15000); pg.keyboard.up('KeyW'); s=st(); ok('teclado: W avanza (norte)', s['z']<z0-0.4,(z0,s['z']))
         # desde un punto libre: el control es relativo a la cámara y en diagonal se choca con el contenedor (x 1.35–2.5, z −7…−5)
-        tp(0,-2); pg.keyboard.down('ArrowRight'); pg.keyboard.down('ShiftLeft'); pg.wait_for_timeout(2500); pg.keyboard.up('ArrowRight'); pg.keyboard.up('ShiftLeft'); s=st(); ok('colisión con la pared del callejón', 1.9<s['x']<=2.17, s['x'])
+        tp(0,-2); pg.keyboard.down('ArrowRight'); pg.keyboard.down('ShiftLeft'); until("__sueno.player.pos.x>2.1",15000); pg.wait_for_timeout(600); pg.keyboard.up('ArrowRight'); pg.keyboard.up('ShiftLeft'); s=st(); ok('colisión con la pared del callejón', 1.9<s['x']<=2.17, s['x'])
         # clic en el suelo: ir a un punto
-        tp(0,-3); c=xy(0.4,0,-5.2); pg.mouse.click(*c); pg.wait_for_function("!__sueno.input.dest",timeout=9000); s=st(); ok('clic en el suelo: el protagonista va a ese punto', abs(s['x']-0.4)<0.4 and abs(s['z']+5.2)<0.4, (s['x'],s['z']))
+        tp(0,-3); c=xy(0.4,0,-5.2); pg.mouse.click(*c); until("!__sueno.input.dest"); s=st(); ok('clic en el suelo: el protagonista va a ese punto', abs(s['x']-0.4)<0.4 and abs(s['z']+5.2)<0.4, (s['x'],s['z']))
     shot('callejon')
     # ---- callejón: nota, linterna, pintada (se abre sola), puerta ----
     act(-0.9,-3.5); s=st(); ok('nota → cuaderno', 'nota' in s['docs'] and s['f'].get('doc_nota'))
@@ -127,9 +130,9 @@ with sync_playwright() as p:
     c=ev("()=>{const g=__sueno,it=g.world.inter.find(i=>i.id==='linterna');const v=it.hitbox.position.clone().project(g.cams.cam);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight]}")
     cur=None
     if not MOBILE: pg.mouse.move(c[0],c[1]); pg.wait_for_timeout(300); cur=ev("document.getElementById('c').style.cursor")
-    point(c[0],c[1]); pg.wait_for_function("__sueno.state.inv.includes('linterna')",timeout=9000); flush()
+    point(c[0],c[1]); until("__sueno.state.inv.includes('linterna')"); flush()
     ok('objeto lejano: toque o clic → camina hasta él y lo coge', 'linterna' in st()['inv'] and (MOBILE or cur=='pointer'),(cur,st()['inv']))
-    tp(-0.6,-14.5); pg.wait_for_function("__sueno.ui.modal==='doc'",timeout=6000); shot('pintada'); flush()
+    tp(-0.6,-14.5); until("__sueno.ui.modal==='doc'",20000); shot('pintada'); flush()
     ok('pintada: al pasar cerca se abre sola como documento', 'grafiti' in st()['docs'])
     pg.wait_for_timeout(600); ok('pintada ya leída: no se abre otra vez sola', st()['modal'] is None and not st()['busy'])
     act(-1.8,-9); ok('puerta del callejón (golpes)', st()['f'].get('golpes'))
@@ -137,7 +140,7 @@ with sync_playwright() as p:
     book(1); ok('cuaderno con 2 documentos', st()['modal']=='book' and ev("document.querySelectorAll('#bookBody [data-d]').length")>=2); close_book()
     # ---- plaza ----
     tp(0,-23.5); pg.wait_for_timeout(600); flush(); s=st(); ok('plaza: primera visita, teléfono suena', s['f'].get('plazaVisitada') and ev('__sueno.ringing()'))
-    tp(0,-47.6); c=xy(0,0,-51); point(*c) if c else ev("()=>__sueno.input.goTo(0,-51)"); pg.wait_for_timeout(2600); s=st(); ok('pasaje bloqueado sin luz', s['z']>=-48.95 and (s['dlg'] or s['busy']), s['z']); flush()
+    tp(0,-47.6); c=xy(0,0,-51); point(*c) if c else ev("()=>__sueno.input.goTo(0,-51)"); until("__sueno.busy || !!__sueno.dlg.resolve"); s=st(); ok('pasaje bloqueado sin luz', s['z']>=-48.95 and (s['dlg'] or s['busy']), s['z']); flush()
     # quiosco: de la calle al plano fijo y vuelta
     act(-5.2,-29.2); s=st(); ok('quiosco: el periódico abre el plano fijo y se lee', s['scr']=='quiosco' and s['cam']=='quiosco' and 'periodico' in s['docs'] and 'ciudad' in s['arch'], s)
     pg.wait_for_timeout(400); ok('plano fijo: puntos activos y solo la salida «Salir»', ev("document.querySelectorAll('.hs.on').length")==1 and ev("[...document.querySelectorAll('#nav .nv')].map(b=>b.textContent)")==['Salir'], ev("[...document.querySelectorAll('#nav .nv')].map(b=>b.textContent)"))
@@ -154,8 +157,7 @@ with sync_playwright() as p:
     r=act(12.3,-34); pick('Empujar'); flush(); s=st(); ok('puerta «TIRA»: empujar no abre y tiene consecuencia', not s['f'].get('tiendaAbierta') and s['cor']<100 and s['scr'] is None, s['cor'])
     act(12.3,-34); pick('Tirar'); flush(); ok('puerta «TIRA»: tirar abre', st()['f'].get('tiendaAbierta'))
     tp(10.6,-34); c=xy(13.0,0,-34); point(*c) if c else ev("()=>__sueno.input.goTo(13,-34)")
-    try: pg.wait_for_function("__sueno.scr==='tienda' && !__sueno.going",timeout=9000)
-    except Exception: pass
+    until("__sueno.scr==='tienda' && !__sueno.going",30000)
     pg.wait_for_timeout(300); flush(); s=st(); ok('tienda: al cruzar la puerta andando se entra en el plano fijo', s['scr']=='tienda' and s['cam']=='tienda' and s['f'].get('v_tienda') and abs(s['ret']['x']-11.7)<0.1, s)
     if MOBILE: ok('en un plano fijo no hay controles de movimiento', ev("document.getElementById('touch').classList.contains('hidden')"))
     shot('tienda'); hs('pilas'); ok('pilas recogidas', 'pilas' in st()['inv'])
@@ -179,11 +181,11 @@ with sync_playwright() as p:
     if MOBILE:   # el joystick es una opción de la pausa
         salir(); pause(); tap('[data-p="joy"]'); pg.wait_for_timeout(200); ok('opción «Mando en pantalla: sí»', 'sí' in ev("document.getElementById('joyB').textContent")); tap('[data-p="resume"]'); pg.wait_for_timeout(300)
         ok('joystick visible en la calle', ev("!document.getElementById('touch').classList.contains('hidden') && getComputedStyle(document.getElementById('touch')).display!=='none'"))
-        tp(0,-48.3); z0=st()['z']; up=joy(-46); pg.wait_for_timeout(3000); j=ev("__sueno.input.joy"); up(); pg.wait_for_timeout(300); flush(); s=st()
+        tp(0,-48.3); z0=st()['z']; up=joy(-46); pg.wait_for_timeout(400); j=ev("__sueno.input.joy"); until("__sueno.player.zone==='pasaje' && __sueno.player.pos.z<-50.5",20000); up(); pg.wait_for_timeout(300); flush(); s=st()
         ok('joystick: arriba → entra en el pasaje con linterna', s['zone']=='pasaje' and s['f'].get('luzOn') and j['y']>0.8, (s['z'],j))
         ok('joystick: soltar → parar', ev("__sueno.input.joy")=={'x':0,'y':0})
     else:
-        tp(0,-48.3); pg.keyboard.down('KeyW'); pg.wait_for_timeout(3000); pg.keyboard.up('KeyW'); pg.wait_for_timeout(300); flush(); s=st(); ok('pasaje: con linterna se entra', s['zone']=='pasaje' and s['f'].get('luzOn'), s['z'])
+        tp(0,-48.3); pg.keyboard.down('KeyW'); until("__sueno.player.zone==='pasaje' && __sueno.player.pos.z<-50.5",20000); pg.keyboard.up('KeyW'); pg.wait_for_timeout(300); flush(); s=st(); ok('pasaje: con linterna se entra', s['zone']=='pasaje' and s['f'].get('luzOn'), s['z'])
     for m,(x,z) in {'mano':(-1.2,-52.6),'luna':(1.2,-56.4)}.items(): act(x,z)
     ok('murales', st()['f'].get('mural_mano') and st()['f'].get('mural_luna'))
     tp(0,-57.5); pg.wait_for_timeout(700); s=st(); ok('amenaza: empieza la persecución y la cámara corta', s['chase'] and s['cam']=='pasaje2' and s['scr'] is None, s)
@@ -203,15 +205,15 @@ with sync_playwright() as p:
             if not back: tap('#btnR')
         else:
             pg.keyboard.up('KeyW' if back else 'KeyS'); pg.keyboard.up('ShiftLeft')
-    hold(True,9000); pg.wait_for_timeout(2500); flush(); s=st()
+    hold(True,40000); until('!!__sueno.dlg.resolve',20000); flush(); s=st()
     ok('«NO MIRES ATRÁS»: mirar atrás → atrapado, vuelve a la entrada', s['f'].get('miraste') and not s['chase'] and s['z']>-52 and s['cor']<80, s)
-    tp(0,-57.5); pg.wait_for_timeout(600); hold(False,30000); pg.wait_for_timeout(1500); flush(); s=st()
+    tp(0,-57.5); pg.wait_for_timeout(600); hold(False,90000); pg.wait_for_timeout(1500); flush(); s=st()
     ok('persecución: correr sin volver → escapar', s['f'].get('chaseDone') and not s['chase'] and 'mira' in s['arch'], s)
     act(0.9,-70.2); ok('informe médico', 'informe' in st()['docs'])
-    tp(-0.9,-68.2); pg.wait_for_function("__sueno.ui.modal==='doc'",timeout=6000); flush(); ok('palabras del pasaje: se abren solas', 'pared' in st()['docs'])
+    tp(-0.9,-68.2); until("__sueno.ui.modal==='doc'",20000); flush(); ok('palabras del pasaje: se abren solas', 'pared' in st()['docs'])
     act(-1.2,-60.2); act(1.2,-64); ok('murales completos → archivo', 'simbolos' in st()['arch'])
     # ---- la puerta: placa, pedestal (plano fijo), enigma ----
-    tp(0,-75.5); pg.wait_for_timeout(600); flush(); tp(-2.3,-82.4); pg.wait_for_function("__sueno.ui.modal==='doc'",timeout=6000); flush(); ok('placa: se abre sola', 'placa' in st()['docs'])
+    tp(0,-75.5); pg.wait_for_timeout(600); flush(); tp(-2.3,-82.4); until("__sueno.ui.modal==='doc'",20000); flush(); ok('placa: se abre sola', 'placa' in st()['docs'])
     r=act(0,-80.4); ok('pedestal: plano fijo y enigma', r=='puzzle' and st()['scr']=='pedestal' and st()['cam']=='pedestal', (r,st()['scr']))
     cor=st()['cor']
     for s_ in ['mano','luna','ojo','boca']: tap(f'#plates [data-s="{s_}"]'); pg.wait_for_timeout(120)
@@ -264,9 +266,7 @@ with sync_playwright() as p:
     tp(0,-83)
     if MOBILE: up=joy(-46)
     else: pg.keyboard.down('KeyW'); pg.wait_for_timeout(100)
-    for i in range(40):
-        pg.wait_for_timeout(500)
-        if st()['mode']=='end': break
+    until("__sueno.mode==='end'",60000)
     if MOBILE: up()
     else: pg.keyboard.up('KeyW')
     ok('final: cruzar la verja andando dispara el final', st()['mode']=='end', st()['z'])
