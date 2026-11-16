@@ -211,15 +211,14 @@ with sync_playwright() as p:
         for i in range(ms//500):
             pg.wait_for_timeout(500)
             if not st()['chase']: break
-        if MOBILE:
-            up()
-            if not back: tap('#btnR')
+        if MOBILE: up()   # «correr» se apaga después, con los controles otra vez en pantalla (durante un diálogo se ocultan)
         else:
             pg.keyboard.up('KeyW' if back else 'KeyS'); pg.keyboard.up('ShiftLeft')
     hold(True,40000); until('!!__sueno.dlg.resolve',20000); flush(); s=st()
     ok('«NO MIRES ATRÁS»: mirar atrás → atrapado, vuelve a la entrada', s['f'].get('miraste') and not s['chase'] and s['z']>-52 and s['cor']<80, s)
     tp(0,-57.5); pg.wait_for_timeout(600); hold(False,90000); pg.wait_for_timeout(1500); flush(); s=st()
     ok('persecución: correr sin volver → escapar', s['f'].get('chaseDone') and not s['chase'] and 'mira' in s['arch'], s)
+    if MOBILE: pg.wait_for_selector('#btnR',state='visible',timeout=10000); tap('#btnR'); ok('botón correr: se apaga', not ev("__sueno.input.runT"))
     act(0.9,-70.2); ok('informe médico', 'informe' in st()['docs'])
     tp(-0.9,-68.2); until("__sueno.ui.modal==='doc'",20000); flush(); ok('palabras del pasaje: se abren solas', 'pared' in st()['docs'])
     act(-1.2,-60.2); act(1.2,-64); ok('murales completos → archivo', 'simbolos' in st()['arch'])
